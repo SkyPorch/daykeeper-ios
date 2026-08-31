@@ -1,0 +1,42 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ios-package:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22.22.0
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+      - run: node Scripts/check-contract.mjs
+      - run: swift format lint --strict --recursive Package.swift Sources Tests Examples
+      - run: swift test --skip WireTests -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors
+      - run: node Scripts/check-wire.mjs
+      - name: Generic simulator compile (not runtime certification)
+        run: xcodebuild -scheme DaykeeperUI -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData/Generic CODE_SIGNING_ALLOWED=NO build
+      - name: Native SwiftPM consumer and UI checks
+        run: node Scripts/check-ios.mjs
+      - name: Native test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-ios-test-results
+          path: TestResults/
+          if-no-files-found: warn
+          retention-days: 7
