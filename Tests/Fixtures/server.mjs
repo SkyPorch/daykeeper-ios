@@ -10,6 +10,7 @@ const message = (content = "Hello from support", type = 1, id = 9) => ({ id, con
   sender: { name: type === 1 ? "Daykeeper support" : "You", avatarUrl: null }, attachments: [] });
 const histories = new Map();
 const createdCases = new Set();
+const seenCustomers = new Set();
 let origin;
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, origin);
@@ -30,6 +31,7 @@ const server = createServer(async (request, response) => {
   receipt.hits++; receipt.cookies.push(Boolean(request.headers.cookie)); receipt.methods.push(request.method);
   const path = `/${rest.join("/")}`;
   const customer = request.headers.authorization === "Bearer fixture-b" ? "b" : "a";
+  const currentConversation = () => ({...conversation(customer), unreadForContact: seenCustomers.has(`${key}-${customer}`) ? 0 : 1});
   const json = (status, value, extra = {}) => {
     response.writeHead(status,{"content-type":"application/json","cache-control":"no-store",...extra}); response.end(JSON.stringify(value));
   };
@@ -48,14 +50,17 @@ const server = createServer(async (request, response) => {
     if(request.method === "POST") {
       receipt.creates++; createdCases.add(key);
       if(key.startsWith("newcreation500"))return json(500,{error:"support_upstream_unavailable",retryable:true});
-      return json(201,{conversation:conversation(customer)});
+      return json(201,{conversation:currentConversation()});
     }
-    return json(200,{conversations:key.startsWith("new") && !createdCases.has(key) ? [] : [conversation(customer)],widgetConversationId:null},
+    return json(200,{conversations:key.startsWith("new") && !createdCases.has(key) ? [] : [currentConversation()],widgetConversationId:null},
       key.startsWith("cache") ? {"cache-control":"public, max-age=600",etag:'"synthetic-cache"'} :
       key.startsWith("cookie") ? {"set-cookie":"daykeeper_fixture=synthetic; Path=/; HttpOnly"} : {});
   }
-  if (path === "/v1/conversations/7/seen") {receipt.seen++;return json(200,{conversationId:7,seen:true,seenAt:123});}
-  if (path === "/v1/unread") return json(200,{unreadCount:1,conversation:conversation(customer),conversations:[conversation(customer)]});
+  if (path === "/v1/conversations/7/seen") {receipt.seen++;seenCustomers.add(`${key}-${customer}`);return json(200,{conversationId:7,seen:true,seenAt:123});}
+  if (path === "/v1/unread") {
+    const conversation = currentConversation();
+    return json(200,{unreadCount:conversation.unreadForContact,conversation:conversation.unreadForContact ? conversation : null,conversations:conversation.unreadForContact ? [conversation] : []});
+  }
   if (path === "/v1/conversations/7/messages") {
     const historyKey = `${key}-${customer}`;
     const history = histories.get(historyKey) ?? (key.startsWith("new") ? [] : [message(`Hello from support for customer ${customer}`)]); histories.set(historyKey,history);

@@ -11,6 +11,9 @@ private actor CustomerFixture: CustomerAPI {
   private(set) var sends = 0
   private(set) var creates = 0
   private var rejected = false
+  private var seen = false
+  private let unreadAfterSeen: Int
+  init(unreadAfterSeen: Int = 0) { self.unreadAfterSeen = unreadAfterSeen }
   private var sendContinuation: CheckedContinuation<DaykeeperMessageResult, Never>?
   private var createContinuation: CheckedContinuation<DaykeeperConversationResult, Never>?
   func listConversations() async throws -> DaykeeperConversationList {
@@ -20,8 +23,12 @@ private actor CustomerFixture: CustomerAPI {
       )
       throw error
     }
-    return try decode(
-      "{\"conversations\":[\(Self.conversationJSON)],\"widgetConversationId\":null}")
+    let conversation =
+      seen
+      ? Self.conversationJSON.replacingOccurrences(
+        of: "\"unreadForContact\":1", with: "\"unreadForContact\":\(unreadAfterSeen)")
+      : Self.conversationJSON
+    return try decode("{\"conversations\":[\(conversation)],\"widgetConversationId\":null}")
   }
   func revoke() { rejected = true }
   func listMessages(in conversationID: Int64, after: Int64?) async throws -> DaykeeperMessageList {
@@ -37,7 +44,8 @@ private actor CustomerFixture: CustomerAPI {
     return await withCheckedContinuation { sendContinuation = $0 }
   }
   func markConversationSeen(_ conversationID: Int64) async throws -> DaykeeperSeenResult {
-    try decode(#"{"conversationId":7,"seen":true,"seenAt":123}"#)
+    seen = true
+    return try decode(#"{"conversationId":7,"seen":true,"seenAt":123}"#)
   }
   func finishSend() throws {
     sendContinuation?.resume(returning: try decode("{\"message\":\(Self.messageJSON)}"))
@@ -53,6 +61,20 @@ private actor CustomerFixture: CustomerAPI {
 }
 
 final class SessionTests: XCTestCase {
+  @MainActor func testConfirmedReadMarkerRefreshesUnreadSummaryWithoutDroppingDraft() async throws {
+    for unreadAfterSeen in [0, 2] {
+      let api = CustomerFixture(unreadAfterSeen: unreadAfterSeen)
+      let active = DaykeeperMessengerSession(customerAPI: api)
+      await active.refresh()
+      await active.selectConversation(7)
+      active.draft = "Preserved while reading"
+      XCTAssertEqual(active.conversations.first?.unreadForContact, 1)
+      await active.markRead()
+      XCTAssertEqual(active.conversations.first?.unreadForContact, unreadAfterSeen)
+      XCTAssertEqual(active.draft, "Preserved while reading")
+      XCTAssertEqual(active.selectedConversationID, 7)
+    }
+  }
   @MainActor func testResetDropsClientAndCustomerPresentation() throws {
     let client = try DaykeeperClient(baseURL: URL(string: "https://example.test")!) { _ in
       "synthetic-token"

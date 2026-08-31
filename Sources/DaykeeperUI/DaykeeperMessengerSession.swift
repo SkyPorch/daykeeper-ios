@@ -113,8 +113,13 @@ extension DaykeeperClient: CustomerAPI {}
   public func markRead() async {
     guard let id = selectedConversationID else { return }
     // A read marker is still a write: it is never retried automatically.
+    var confirmed = false
     await perform(
-      write: .marker, action: { try await $0.markConversationSeen(id) }, success: { _ in })
+      write: .marker, action: { try await $0.markConversationSeen(id) },
+      success: { _ in confirmed = true })
+    // Read server truth rather than blindly clearing a count that may already
+    // include a newer incoming message. This cannot repeat the write.
+    if confirmed { await refresh() }
   }
 
   /// Explicitly discard a preserved draft only after the human reviews history.

@@ -9,6 +9,11 @@ runner removed its own test simulator after completion.
 - [Sent message and composer, light](conversation-light.png)
 - [Large text and preserved draft, dark](large-text-dark.png)
 - [Quota guidance and preserved draft, dark](quota-dark.png)
+- [List after a confirmed read marker, light](after-seen-light.png)
+
+The read-marker regression screenshot comes from the subsequent six-case native
+rerun. It verifies the list refreshes after the write: the earlier unread label
+becomes the server's current status, without another marker write.
 
 These are **after** screenshots. The base branch contains only a repository
 scaffold and has no native screen from which to capture a before screenshot.

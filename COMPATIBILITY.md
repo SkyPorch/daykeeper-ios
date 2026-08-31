@@ -53,9 +53,10 @@ Inspect the exact CI run and result bundle for the revision under review.
 - CocoaPods distribution, signed XCFrameworks, Objective-C wrappers, or release
   tags. SwiftUI can be hosted by a UIKit app using `UIHostingController`.
 
-Unread refresh and read markers are explicit; opening a conversation does not
-silently mark it read. Attachment metadata is returned but never opened by the
-view. Unknown content is rendered as plain text. The host may build additional
+Read markers are explicit; opening a conversation does not silently mark it read.
+A confirmed marker refreshes server summaries, preserving drafts and newer unread
+messages without repeating the write. Attachment metadata is returned but never
+opened by the view. Unknown content is rendered as plain text. The host may build additional
 UI using the headless API while retaining these security boundaries.
 
 These gates apply to this repository only. Android, web, React Native, Cordova,
