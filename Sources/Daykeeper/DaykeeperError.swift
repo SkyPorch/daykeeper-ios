@@ -24,7 +24,9 @@ public struct DaykeeperError: Error, Sendable, Equatable, Codable, CustomStringC
   internal func forWrite(dispatched: Bool) -> Self {
     Self(
       code, status: status, retryable: false,
-      outcomeUnknown: status.map { $0 == 408 || $0 >= 500 } ?? dispatched)
+      // A POST may already be accepted before a redirect, even if its Location
+      // header is missing. Only an explicit non-timeout 4xx is a definite rejection.
+      outcomeUnknown: dispatched && (status.map { !(400..<500).contains($0) || $0 == 408 } ?? true))
   }
 
   internal static let safeAPICodes: Set<String> = [

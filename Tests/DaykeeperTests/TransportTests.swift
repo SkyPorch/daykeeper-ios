@@ -178,6 +178,22 @@ final class TransportTests: XCTestCase {
     }
   }
 
+  func testRedirectStatusesWithoutLocationKeepWriteOutcomeUncertain() async throws {
+    for status in [300, 301, 302, 303, 304, 305, 307, 308] {
+      let stub = Stub([.json(status, [:])])
+      let client = try stub.client { _ in "synthetic-token" }
+      do {
+        _ = try await client.createConversation()
+        XCTFail("Expected redirect rejection")
+      } catch let error as DaykeeperError {
+        XCTAssertEqual(error.status, status)
+        XCTAssertTrue(error.outcomeUnknown)
+        XCTAssertFalse(error.retryable)
+      }
+      XCTAssertEqual(stub.requests.count, 1)
+    }
+  }
+
   func testExplicitReadDenialSurvivesMalformedErrorCodeAndRedactsRemoteText() async throws {
     for code: Any in ["private-server-secret", ["private": "server-secret"]] {
       let stub = Stub([
