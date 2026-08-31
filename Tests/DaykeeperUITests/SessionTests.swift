@@ -13,10 +13,17 @@ private actor CustomerFixture: CustomerAPI {
   private var rejected = false
   private var seen = false
   private let unreadAfterSeen: Int
-  init(unreadAfterSeen: Int = 0) { self.unreadAfterSeen = unreadAfterSeen }
+  private let uncertainWrites: Bool
+  private var listFailure = false
+  private var historyFailure = false
+  init(unreadAfterSeen: Int = 0, uncertainWrites: Bool = false) {
+    self.unreadAfterSeen = unreadAfterSeen
+    self.uncertainWrites = uncertainWrites
+  }
   private var sendContinuation: CheckedContinuation<DaykeeperMessageResult, Never>?
   private var createContinuation: CheckedContinuation<DaykeeperConversationResult, Never>?
   func listConversations() async throws -> DaykeeperConversationList {
+    if listFailure { throw try failure() }
     if rejected {
       let error: DaykeeperError = try decode(
         #"{"code":"daykeeper_request_failed","status":403,"retryable":false,"outcomeUnknown":false}"#
@@ -31,16 +38,28 @@ private actor CustomerFixture: CustomerAPI {
     return try decode("{\"conversations\":[\(conversation)],\"widgetConversationId\":null}")
   }
   func revoke() { rejected = true }
+  func failReads(list: Bool, history: Bool) {
+    listFailure = list
+    historyFailure = history
+  }
+  private func failure() throws -> DaykeeperError {
+    try decode(
+      #"{"code":"support_upstream_unavailable","status":503,"retryable":false,"outcomeUnknown":true}"#
+    )
+  }
   func listMessages(in conversationID: Int64, after: Int64?) async throws -> DaykeeperMessageList {
-    try decode("{\"messages\":[]}")
+    if historyFailure { throw try failure() }
+    return try decode("{\"messages\":[]}")
   }
   func createConversation() async throws -> DaykeeperConversationResult {
     creates += 1
+    if uncertainWrites { throw try failure() }
     return await withCheckedContinuation { createContinuation = $0 }
   }
   func sendMessage(in conversationID: Int64, content: String) async throws -> DaykeeperMessageResult
   {
     sends += 1
+    if uncertainWrites { throw try failure() }
     return await withCheckedContinuation { sendContinuation = $0 }
   }
   func markConversationSeen(_ conversationID: Int64) async throws -> DaykeeperSeenResult {
@@ -61,6 +80,76 @@ private actor CustomerFixture: CustomerAPI {
 }
 
 final class SessionTests: XCTestCase {
+  @MainActor func testUncertainDraftRequiresSuccessfulFreshHistoryAndExplicitReview() async throws {
+    let api = CustomerFixture(uncertainWrites: true)
+    let active = DaykeeperMessengerSession(customerAPI: api)
+    await active.refresh()
+    await active.selectConversation(7)
+    active.draft = "Preserve this uncertain message"
+    await active.sendMessage()
+    XCTAssertFalse(active.canDiscardUncertainDraft)
+    XCTAssertFalse(active.canEditDraft)
+    active.discardUncertainDraft()
+    XCTAssertEqual(active.draft, "Preserve this uncertain message")
+    await api.failReads(list: false, history: true)
+    await active.refresh()
+    XCTAssertFalse(active.canDiscardUncertainDraft)
+    await api.failReads(list: false, history: false)
+    await active.refresh()
+    XCTAssertTrue(active.canDiscardUncertainDraft)
+    XCTAssertFalse(active.canEditDraft)
+    await api.failReads(list: true, history: false)
+    await active.refresh()
+    XCTAssertFalse(active.canDiscardUncertainDraft)
+    await api.failReads(list: false, history: false)
+    await active.refresh()
+    active.discardUncertainDraft()
+    XCTAssertEqual(active.draft, "")
+    XCTAssertTrue(active.canEditDraft)
+    let sends = await api.sends
+    XCTAssertEqual(sends, 1)
+    active.reset()
+  }
+
+  @MainActor func testUncertainCreationRequiresFreshListAndDoesNotRepeatWrite() async throws {
+    let api = CustomerFixture(uncertainWrites: true)
+    let active = DaykeeperMessengerSession(customerAPI: api)
+    await active.createConversation()
+    active.acknowledgeUncertainCreationAfterReview()
+    XCTAssertTrue(active.uncertainCreation)
+    XCTAssertFalse(active.canAcknowledgeUncertainCreation)
+    await api.failReads(list: true, history: false)
+    await active.refresh()
+    active.acknowledgeUncertainCreationAfterReview()
+    XCTAssertTrue(active.uncertainCreation)
+    await api.failReads(list: false, history: false)
+    await active.refresh()
+    XCTAssertTrue(active.canAcknowledgeUncertainCreation)
+    active.acknowledgeUncertainCreationAfterReview()
+    XCTAssertFalse(active.uncertainCreation)
+    let creates = await api.creates
+    XCTAssertEqual(creates, 1)
+    active.reset()
+  }
+
+  @MainActor func testBackgroundInvalidatesPriorRecoveryReadiness() async throws {
+    let api = CustomerFixture(uncertainWrites: true)
+    let active = DaykeeperMessengerSession(customerAPI: api)
+    await active.refresh()
+    await active.selectConversation(7)
+    active.draft = "Preserved"
+    await active.sendMessage()
+    await active.refresh()
+    XCTAssertTrue(active.canDiscardUncertainDraft)
+    active.suspend()
+    await api.failReads(list: true, history: false)
+    await active.resume()
+    XCTAssertFalse(active.canDiscardUncertainDraft)
+    active.discardUncertainDraft()
+    XCTAssertEqual(active.draft, "Preserved")
+    active.reset()
+  }
+
   @MainActor func testConfirmedReadMarkerRefreshesUnreadSummaryWithoutDroppingDraft() async throws {
     for unreadAfterSeen in [0, 2] {
       let api = CustomerFixture(unreadAfterSeen: unreadAfterSeen)

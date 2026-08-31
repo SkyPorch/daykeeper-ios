@@ -111,9 +111,10 @@ do not log them.
   never automatically replayed after a timeout, cancellation, 401, or 5xx.
 - `outcomeUnknown` means a write may have reached the server. Refresh and inspect
   history before a deliberate new action. Cancellation cannot undo server work.
-- The messenger preserves an uncertain message draft and disables Send until
-  the human explicitly discards it after review. Uncertain creation likewise
-  requires an explicit review acknowledgement. Neither action resends anything.
+- The messenger preserves an uncertain message draft and disables editing, Send,
+  and discard until a fresh history read succeeds. Failed reads and backgrounding
+  invalidate that readiness. Uncertain creation similarly requires a successful
+  fresh list read before acknowledgement. Neither recovery action resends anything.
 - Usage ceilings preserve history and drafts. They do not trigger upgrades,
   billing actions, or automatic retries.
 

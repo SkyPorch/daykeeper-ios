@@ -11,18 +11,23 @@ certification is implied by the source or CI checks.
 | SwiftPM | Headless and SwiftUI products; native example imports the package | Approved tag and external clean tagged-install receipt |
 | Customer API | Eight operations, typed decoding, safe errors, prefix routing | Deployed tenant/gateway contract parity |
 | Transport | Real URLSession redirect, cookie/cache isolation, token refresh, stream/deadline/cancellation and write-attempt tests | TLS chain, proxy/load-balancer and physical-network matrix |
-| Native messenger | List/history/plain-text send/seen, drafts, logout and account switching | Full support feature parity |
+| Native messenger | List/history/plain-text send/seen, drafts, logout, account switching and fresh-read recovery guards | Full support feature parity and current-head native rerun |
 | Lifecycle | Background masking, draft preservation, late-result fencing | Physical-device/app-switcher privacy verification |
 | UI | iPhone simulator; light/dark and one accessibility text size | iPad, landscape, small-screen and full VoiceOver/Dynamic Type matrix |
 | Deployment | iOS 15 declared; generic simulator build | iOS 15 minimum-runtime and older compiler certification |
 
-Local baseline: Xcode 26.6, Swift 6.3.3, macOS-hosted strict-concurrency unit/wire
-tests and iOS 26.5 simulator native UI tests. The minimum Swift tools version is
+Local baseline: Xcode 26.6, Swift 6.3.3, 24 macOS-hosted strict-concurrency unit
+tests and 8 isolated loopback wire tests. A prior candidate revision passed the
+six iOS 26.5 simulator UI cases. The fresh-read recovery revision still requires
+a completed native rerun: its first isolated run was interrupted by host disk
+pressure after three cases passed, and a retry could not create a simulator while
+CoreSimulatorService was unavailable. This is an environment failure, not a test
+assertion, but it is not passing evidence. The minimum Swift tools version is
 a package declaration, not a claim that Swift 5.9 has been runtime-certified.
 The macOS 12 target supports development/testing; this candidate is not marketed
 as a certified macOS messenger. Swift 6 language mode is not yet certified.
 
-The native example uses a fresh loopback fixture and a new simulator per run.
+The native example is designed to use a fresh loopback fixture and a new simulator per run.
 It never uses an existing device, real customer token, live inbox, or production
 database. Fixture success is not a live-provider or complete multi-tenant audit.
 Inspect the exact CI run and result bundle for the revision under review.

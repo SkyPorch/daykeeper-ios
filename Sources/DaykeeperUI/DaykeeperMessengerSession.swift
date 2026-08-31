@@ -24,6 +24,8 @@ extension DaykeeperClient: CustomerAPI {}
   @Published public private(set) var uncertainCreation = false
   @Published public private(set) var uncertainThreads: Set<Int64> = []
   @Published public var draft = ""
+  @Published private var reviewedUncertainThreads: Set<Int64> = []
+  @Published private var creationReviewed = false
 
   private var client: (any CustomerAPI)?
   private var revision = 0
@@ -40,15 +42,31 @@ extension DaykeeperClient: CustomerAPI {}
   public convenience init(client: DaykeeperClient) { self.init(customerAPI: client) }
   internal init(customerAPI: any CustomerAPI) { client = customerAPI }
 
-  public var canSend: Bool {
+  public var canEditDraft: Bool {
     guard let id = selectedConversationID else { return false }
     return !isBusy && !isSuspended && !isSignedOut && !uncertainThreads.contains(id)
-      && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  public var canSend: Bool {
+    canEditDraft && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       && draft.utf16.count <= 16_000
   }
 
+  public var canDiscardUncertainDraft: Bool {
+    guard !isBusy, !isSuspended, !isSignedOut, let id = selectedConversationID else { return false }
+    return uncertainThreads.contains(id) && reviewedUncertainThreads.contains(id)
+  }
+
+  public var canAcknowledgeUncertainCreation: Bool {
+    !isBusy && !isSuspended && !isSignedOut && selectedConversationID == nil
+      && uncertainCreation && creationReviewed
+  }
+
   public func refresh() async {
+    guard !isBusy, !isSuspended, !isSignedOut else { return }
     let selected = selectedConversationID
+    if let selected { reviewedUncertainThreads.remove(selected) }
+    creationReviewed = false
     await perform { api in
       let list = try await api.listConversations()
       let messages = try await selected.mapAsync {
@@ -58,18 +76,26 @@ extension DaykeeperClient: CustomerAPI {}
     } success: { result in
       self.conversations = result.0
       if let messages = result.1 { self.messages = messages }
+      if let selected, self.uncertainThreads.contains(selected) {
+        self.reviewedUncertainThreads.insert(selected)
+      }
+      if selected == nil && self.uncertainCreation { self.creationReviewed = true }
     }
   }
 
   public func selectConversation(_ id: Int64) async {
-    guard conversations.contains(where: { $0.id == id }) else { return }
+    guard !isBusy, !isSuspended, !isSignedOut, conversations.contains(where: { $0.id == id }) else {
+      return
+    }
     saveDraft()
+    reviewedUncertainThreads.remove(id)
     await perform {
       try await $0.listMessages(in: id, after: nil)
     } success: { result in
       self.selectedConversationID = id
       self.messages = result.messages
       self.draft = self.drafts[id] ?? ""
+      if self.uncertainThreads.contains(id) { self.reviewedUncertainThreads.insert(id) }
     }
   }
 
@@ -125,18 +151,20 @@ extension DaykeeperClient: CustomerAPI {}
   /// Explicitly discard a preserved draft only after the human reviews history.
   /// This does not cancel or reverse any previously accepted server write.
   public func discardUncertainDraft() {
-    guard !isBusy, let id = selectedConversationID, uncertainThreads.contains(id) else { return }
+    guard canDiscardUncertainDraft, let id = selectedConversationID else { return }
     draft = ""
     drafts[id] = nil
     uncertainThreads.remove(id)
+    reviewedUncertainThreads.remove(id)
     error = nil
   }
 
   /// Human acknowledgement only, after inspecting the refreshed conversation
   /// list. This does not retry, cancel or undo the earlier create request.
   public func acknowledgeUncertainCreationAfterReview() {
-    guard !isBusy, !isSuspended, !isSignedOut else { return }
+    guard canAcknowledgeUncertainCreation else { return }
     uncertainCreation = false
+    creationReviewed = false
     error = nil
   }
 
@@ -145,6 +173,8 @@ extension DaykeeperClient: CustomerAPI {}
     saveDraft()
     suspendedSelection = selectedConversationID
     invalidate()
+    reviewedUncertainThreads = []
+    creationReviewed = false
     isSuspended = true
     conversations = []
     messages = []
@@ -176,6 +206,8 @@ extension DaykeeperClient: CustomerAPI {}
     error = nil
     uncertainCreation = false
     uncertainThreads = []
+    reviewedUncertainThreads = []
+    creationReviewed = false
     isSuspended = false
     isSignedOut = true
   }
@@ -192,8 +224,12 @@ extension DaykeeperClient: CustomerAPI {}
 
   private func recordUncertainty(_ write: WriteConcern?) {
     switch write {
-    case .creation: uncertainCreation = true
-    case .message(let id): uncertainThreads.insert(id)
+    case .creation:
+      uncertainCreation = true
+      creationReviewed = false
+    case .message(let id):
+      uncertainThreads.insert(id)
+      reviewedUncertainThreads.remove(id)
     case .marker, .none: break
     }
   }

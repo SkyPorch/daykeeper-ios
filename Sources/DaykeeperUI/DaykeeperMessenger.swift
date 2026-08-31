@@ -84,7 +84,7 @@ public struct DaykeeperMessenger: View {
       )
       .font(.callout).padding()
       Button("Finish reviewing conversations") { creationConfirmation = true }
-        .disabled(session.isBusy).padding(.bottom)
+        .disabled(!session.canAcknowledgeUncertainCreation).padding(.bottom)
     }
   }
 
@@ -155,14 +155,14 @@ public struct DaykeeperMessenger: View {
             "Your message may have been sent. The draft is preserved. Refresh and review history; it will not be sent again automatically."
           ).font(.callout)
           Button("Discard draft after review") { discardConfirmation = true }.disabled(
-            session.isBusy)
+            !session.canDiscardUncertainDraft)
         }.padding()
       }
       HStack(alignment: .bottom) {
         TextEditor(text: $session.draft)
           .focused($isEditing)
           .frame(minHeight: 48, maxHeight: 120).border(Color.secondary.opacity(0.3))
-          .disabled(session.isBusy)
+          .disabled(!session.canEditDraft)
           .accessibilityLabel("Message").accessibilityIdentifier("daykeeper.message")
         Button("Send") {
           isEditing = false
