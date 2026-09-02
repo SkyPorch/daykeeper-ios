@@ -3,6 +3,7 @@ import Daykeeper
 import Foundation
 
 internal protocol CustomerAPI: Sendable {
+  func getIdentity() async throws -> DaykeeperCustomerIdentity
   func listConversations() async throws -> DaykeeperConversationList
   func createConversation() async throws -> DaykeeperConversationResult
   func listMessages(in conversationID: Int64, after: Int64?) async throws -> DaykeeperMessageList
@@ -23,6 +24,8 @@ extension DaykeeperClient: CustomerAPI {}
   @Published public private(set) var error: DaykeeperError?
   @Published public private(set) var uncertainCreation = false
   @Published public private(set) var uncertainThreads: Set<Int64> = []
+  /// True once a thread is open and the gateway has served at least one page.
+  @Published public private(set) var canLoadEarlierMessages = false
   @Published public var draft = ""
   @Published private var reviewedUncertainThreads: Set<Int64> = []
   @Published private var creationReviewed = false
@@ -67,15 +70,20 @@ extension DaykeeperClient: CustomerAPI {}
     let selected = selectedConversationID
     if let selected { reviewedUncertainThreads.remove(selected) }
     creationReviewed = false
+    // Ask only for what is new. Re-reading a long thread in full can exceed the
+    // transport's response ceiling and make the whole conversation unreadable.
+    let cursor = selected == nil ? nil : messages.last?.id
     await perform { api in
       let list = try await api.listConversations()
       let messages = try await selected.mapAsync {
-        try await api.listMessages(in: $0, after: nil).messages
+        try await api.listMessages(in: $0, after: cursor).messages
       }
       return (list.conversations, messages)
     } success: { result in
       self.conversations = result.0
-      if let messages = result.1 { self.messages = messages }
+      if let messages = result.1 {
+        if cursor == nil { self.replaceMessages(messages) } else { self.mergeMessages(messages) }
+      }
       if let selected, self.uncertainThreads.contains(selected) {
         self.reviewedUncertainThreads.insert(selected)
       }
@@ -93,7 +101,7 @@ extension DaykeeperClient: CustomerAPI {}
       try await $0.listMessages(in: id, after: nil)
     } success: { result in
       self.selectedConversationID = id
-      self.messages = result.messages
+      self.replaceMessages(result.messages)
       self.draft = self.drafts[id] ?? ""
       if self.uncertainThreads.contains(id) { self.reviewedUncertainThreads.insert(id) }
     }
@@ -103,7 +111,7 @@ extension DaykeeperClient: CustomerAPI {}
     guard !isBusy else { return }
     saveDraft()
     selectedConversationID = nil
-    messages = []
+    replaceMessages([])
     draft = ""
     error = nil
   }
@@ -116,7 +124,7 @@ extension DaykeeperClient: CustomerAPI {}
       success: { result in
         self.conversations.insert(result.conversation, at: 0)
         self.selectedConversationID = result.conversation.id
-        self.messages = []
+        self.replaceMessages([])
         self.draft = ""
       })
   }
@@ -128,9 +136,7 @@ extension DaykeeperClient: CustomerAPI {}
     await perform(
       write: .message(id), action: { try await $0.sendMessage(in: id, content: content) },
       success: { result in
-        if !self.messages.contains(where: { $0.id == result.message.id }) {
-          self.messages.append(result.message)
-        }
+        self.mergeMessages([result.message])
         self.draft = ""
         self.drafts[id] = nil
       })
@@ -147,6 +153,26 @@ extension DaykeeperClient: CustomerAPI {}
     // include a newer incoming message. This cannot repeat the write.
     if confirmed { await refresh() }
   }
+
+  /// Ask the gateway for the conversation's default window again and fold any
+  /// message we do not already hold into the thread, oldest first. The customer
+  /// contract exposes only a forward `after` cursor, so this is the widest
+  /// backward request the client is allowed to make. It never drops what is
+  /// already loaded and never replays a write.
+  public func loadEarlierMessages() async {
+    guard canLoadEarlierMessages, !isBusy, !isSuspended, !isSignedOut,
+      let id = selectedConversationID
+    else { return }
+    await perform {
+      try await $0.listMessages(in: id, after: nil)
+    } success: { result in
+      self.mergeMessages(result.messages)
+    }
+  }
+
+  /// Newest message the client holds for the open thread. Refresh uses it as the
+  /// `after` cursor so an already-loaded thread is never re-read in full.
+  public var latestLoadedMessageID: Int64? { messages.last?.id }
 
   /// Explicitly discard a preserved draft only after the human reviews history.
   /// This does not cancel or reverse any previously accepted server write.
@@ -177,7 +203,7 @@ extension DaykeeperClient: CustomerAPI {}
     creationReviewed = false
     isSuspended = true
     conversations = []
-    messages = []
+    replaceMessages([])
     selectedConversationID = nil
     draft = ""
     error = nil
@@ -198,7 +224,7 @@ extension DaykeeperClient: CustomerAPI {}
     invalidate()
     client = nil
     conversations = []
-    messages = []
+    replaceMessages([])
     selectedConversationID = nil
     draft = ""
     drafts = [:]
@@ -213,6 +239,21 @@ extension DaykeeperClient: CustomerAPI {}
   }
 
   private func saveDraft() { if let id = selectedConversationID { drafts[id] = draft } }
+
+  private func replaceMessages(_ values: [DaykeeperMessage]) {
+    messages = values.sorted { $0.id < $1.id }
+    canLoadEarlierMessages = selectedConversationID != nil && !values.isEmpty
+  }
+
+  /// Pages arrive newest-side first and may overlap after a resend or a seen
+  /// marker, so fold by identifier and keep the monotonic order.
+  private func mergeMessages(_ values: [DaykeeperMessage]) {
+    guard !values.isEmpty else { return }
+    var byID = Dictionary(messages.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
+    for value in values { byID[value.id] = value }
+    messages = byID.values.sorted { $0.id < $1.id }
+    canLoadEarlierMessages = selectedConversationID != nil && !messages.isEmpty
+  }
   private func invalidate() {
     recordUncertainty(pendingWrite)
     pendingWrite = nil
@@ -220,6 +261,19 @@ extension DaykeeperClient: CustomerAPI {}
     cancelCurrent?()
     cancelCurrent = nil
     isBusy = false
+  }
+
+  /// Exactly one recovery attempt. `getIdentity` is a read, so the client asks
+  /// the host's token provider for a forced refresh on its own 401 and does not
+  /// replay anything. A second failure means the customer really is signed out.
+  private func confirmSessionAfterWriteRejection() async -> Bool {
+    guard let client else { return false }
+    do {
+      _ = try await client.getIdentity()
+      return true
+    } catch {
+      return false
+    }
   }
 
   private func recordUncertainty(_ write: WriteConcern?) {
@@ -254,9 +308,30 @@ extension DaykeeperClient: CustomerAPI {}
       guard ticket == revision else { return }
       let safe = error as? DaykeeperError
       if safe?.status == 401 || safe?.status == 403 {
-        // Revocation must not leave previously loaded customer data visible.
-        // The host can establish a fresh session after authenticating again.
-        reset()
+        guard let write else {
+          // A rejected read means the credential is gone. Revocation must not
+          // leave previously loaded customer data visible; the host can
+          // establish a fresh session after authenticating again.
+          reset()
+          return
+        }
+        // A write may have been accepted before the token expired. Do not throw
+        // the draft and the history away on the first rejection: ask for one
+        // fresh token and prove the customer is still signed in with a read.
+        let stillSignedIn = await confirmSessionAfterWriteRejection()
+        guard ticket == revision else { return }
+        guard stillSignedIn else {
+          reset()
+          return
+        }
+        // Never resend the write. Surface it for review instead.
+        self.error = safe
+        recordUncertainty(write)
+        if ticket == revision {
+          isBusy = false
+          cancelCurrent = nil
+          pendingWrite = nil
+        }
         return
       }
       self.error = safe
