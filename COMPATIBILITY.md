@@ -9,6 +9,7 @@ certification is implied by the source or CI checks.
 | Surface | Candidate coverage | Remaining boundary |
 | --- | --- | --- |
 | SwiftPM | Headless and SwiftUI products; native example imports the package | Approved tag and external clean tagged-install receipt |
+| CocoaPods | Separate `Daykeeper` and `DaykeeperUI` source specs; CocoaPods 1.16.2 metadata and local consumer builds | Approved tag, trunk ownership/publication and clean exact-registry consumer receipt |
 | Customer API | Eight operations, typed decoding, safe errors, prefix routing | Deployed tenant/gateway contract parity |
 | Transport | Real URLSession redirect, cookie/cache isolation, token refresh, stream/deadline/cancellation and write-attempt tests | TLS chain, proxy/load-balancer and physical-network matrix |
 | Native messenger | List/history/plain-text send/seen, drafts, logout, account switching and fresh-read recovery guards | Full support feature parity beyond the tested customer-support core |
@@ -24,6 +25,14 @@ isolation, first conversation and send, unread/seen/sign-out, quota preservation
 and fresh-read recovery after uncertain message and conversation writes. The
 result bundle remains local and contains synthetic fixture data only; it is not a
 portable hosted receipt or live-gateway certification.
+
+The CocoaPods candidate was additionally checked locally on 2026-09-02 with
+CocoaPods 1.16.2. Both podspec metadata contracts passed, `Daykeeper` built in a
+clean generated consumer, and `DaykeeperUI` built as a separate module against
+the exact local `Daykeeper 0.1.0` spec. The unchanged 24 strict unit tests, 8
+loopback wire tests, generic iOS simulator build, independent SwiftPM example and
+all 6 isolated iOS 26.5 UI cases also passed. Local pod lint is not a public-tag,
+registry, physical-device or live-gateway receipt.
 
 Historical GitHub Actions checks for PRs 1 and 2 failed before a workflow step
 because the SkyPorch account reported a payment or spending-limit problem. A
@@ -58,7 +67,10 @@ Inspect the exact CI run and result bundle for the revision under review.
    accessibility and keyboard-layout checks. Review aggregated app privacy data
    and notices for the actual backend deployment.
 5. Approve repository visibility, immutable SemVer tag, release notes and consumer
-   install verification. No automatic publishing or deployment workflow exists.
+   install verification. If CocoaPods remains required, verify trunk ownership
+   and publish both names through the separately approved sequence before trunk's
+   scheduled read-only transition. No automatic publishing or deployment workflow
+   exists.
 
 ## Not implemented in this candidate
 
@@ -68,8 +80,8 @@ Inspect the exact CI run and result bundle for the revision under review.
 - Native anonymous session creation, help center, search, campaigns or outbound UI.
 - Full localization (current UI is English), branding/theme configuration, and
   callbacks for custom navigation/analytics. No analytics is sent by default.
-- CocoaPods distribution, signed XCFrameworks, Objective-C wrappers, or release
-  tags. SwiftUI can be hosted by a UIKit app using `UIHostingController`.
+- Published CocoaPods versions, signed XCFrameworks, Objective-C wrappers, or
+  release tags. SwiftUI can be hosted by a UIKit app using `UIHostingController`.
 
 Read markers are explicit; opening a conversation does not silently mark it read.
 A confirmed marker refreshes server summaries, preserving drafts and newer unread

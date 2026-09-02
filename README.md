@@ -19,8 +19,26 @@ uses this same consumer integration, not direct source inclusion.
 
 After an approved release, the package URL will be
 `https://github.com/SkyPorch/daykeeper-ios.git`. Pin an immutable SemVer release;
-do not depend on a moving development branch in production. There is no CocoaPods
-or binary-framework release in this candidate.
+do not depend on a moving development branch in production.
+
+The same reviewed tag is also a candidate for two source-based CocoaPods:
+
+```ruby
+pod "Daykeeper", "~> 0.1"
+pod "DaykeeperUI", "~> 0.1" # Optional SwiftUI messenger
+```
+
+Neither pod is published. To evaluate the local podspecs, point both modules at
+this checkout so the UI dependency cannot resolve a different core:
+
+```ruby
+pod "Daykeeper", :path => "../daykeeper-ios"
+pod "DaykeeperUI", :path => "../daykeeper-ios"
+```
+
+There is no binary-framework release in this candidate. CocoaPods and SwiftPM
+must resolve the same version and expose the existing `Daykeeper` and
+`DaykeeperUI` module names.
 
 The deployment target is iOS 15. Swift tools 5.9 or newer are required; tested
 toolchains and runtime limits are recorded in [COMPATIBILITY.md](COMPATIBILITY.md).

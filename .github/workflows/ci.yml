@@ -46,10 +46,13 @@ jobs:
         run: |
           xcodebuild -version
           swift --version
+          pod --version
       - run: node Scripts/check-contract.mjs
       - run: swift format lint --strict --recursive Package.swift Sources Tests Examples
       - run: swift test --skip WireTests -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors
       - run: node Scripts/check-wire.mjs
+      - name: CocoaPods metadata and source consumers
+        run: node Scripts/check-cocoapods.mjs
       - name: Generic simulator compile (not runtime certification)
         run: xcodebuild -scheme DaykeeperUI -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData/Generic CODE_SIGNING_ALLOWED=NO build
       - name: Native SwiftPM consumer and UI checks

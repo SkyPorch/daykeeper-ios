@@ -10,5 +10,8 @@
   recovery can be confirmed; failed reads and backgrounding invalidate readiness.
 - Native example, transport/lifecycle tests, isolated wire/UI runners, contract
   provenance, privacy manifest, and documented release gates.
+- Source-based `Daykeeper` and `DaykeeperUI` CocoaPods candidates that preserve
+  the SwiftPM module boundary, exact version dependency, and privacy manifest,
+  with real local consumer builds in CI.
 
 No published release yet. See [COMPATIBILITY.md](COMPATIBILITY.md) for exclusions.

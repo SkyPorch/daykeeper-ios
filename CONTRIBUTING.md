@@ -14,6 +14,7 @@ node Scripts/check-contract.mjs
 swift format lint --strict --recursive Package.swift Sources Tests Examples
 swift test --skip WireTests -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors
 node Scripts/check-wire.mjs
+node Scripts/check-cocoapods.mjs
 node Scripts/check-ios.mjs
 ```
 
@@ -29,6 +30,11 @@ configuration is supplied by its tests. A normal unconfigured or Release launch
 fails closed without connecting anywhere. Regenerate the checked-in project with
 `xcodegen generate --spec Examples/DaykeeperExample/project.yml` after changing
 the project specification; review generated changes for local paths.
+
+The CocoaPods check requires exactly CocoaPods 1.16.2. It parses both podspecs,
+rejects metadata drift or release scripts, then uses `pod lib lint` to compile a
+clean core consumer and a separate UI consumer with the exact local core spec.
+It never pushes a pod or uses a trunk token.
 
 ## Review and releases
 
