@@ -16,8 +16,12 @@ final class MessengerTests: XCTestCase {
       "DAYKEEPER_EXAMPLE_URL": "\(origin)/cases/\(key)",
       "DAYKEEPER_EXAMPLE_DARK": dark ? "1" : "0",
       "DAYKEEPER_EXAMPLE_LARGE_TEXT": large ? "1" : "0",
+      "DAYKEEPER_EXAMPLE_MANUAL_START": "1",
     ]
     app.launch()
+    let start = app.buttons["example.start-fixture"]
+    XCTAssertTrue(start.waitForExistence(timeout: 15))
+    start.tap()
     let readyID = mode.hasPrefix("new") ? "daykeeper.new-conversation" : "daykeeper.conversation.7"
     XCTAssertTrue(app.buttons[readyID].waitForExistence(timeout: 15))
   }

@@ -42,6 +42,16 @@ The runner stopped before starting the fixture or app and still identity-checked
 and deleted its owned simulator. Readiness now has a seven-minute ceiling within
 the job's existing 30-minute limit; the SDK request timeout remains unchanged.
 
+The concurrent stacked-PR run `33613781148` then completed simulator readiness
+but showed Xcode pausing the first app launch for 36 seconds while attaching UI
+automation. That pause again consumed the already-started read deadline; the
+other five cases passed and the owned simulator was deleted. The debug-only
+example now waits for an explicit test-harness action after automation attaches
+before it constructs the synthetic fixture session. This hook is not part of the
+SDK or release behavior. Local run `ee3c90dd-cbff-4e55-bf9c-219441c35fcd`
+passed all six cases with that ordering and removed its exact simulator. A new
+hosted receipt remains required.
+
 No live gateway, production account, customer data, management credential,
 published package, release tag or production traffic was used. Hosted CI and the
 remaining [release gates](../COMPATIBILITY.md) must pass before shipping. External
