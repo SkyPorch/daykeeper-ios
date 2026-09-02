@@ -36,6 +36,12 @@ first-boot migration before readiness and then passed all six UI cases without
 changing the production request timeout. The new revision still requires a
 green hosted rerun.
 
+Hosted run `33613300849` confirmed that GitHub's fresh simulator can remain in
+first-boot data migration for more than the initial two-minute readiness bound.
+The runner stopped before starting the fixture or app and still identity-checked
+and deleted its owned simulator. Readiness now has a seven-minute ceiling within
+the job's existing 30-minute limit; the SDK request timeout remains unchanged.
+
 No live gateway, production account, customer data, management credential,
 published package, release tag or production traffic was used. Hosted CI and the
 remaining [release gates](../COMPATIBILITY.md) must pass before shipping. External
