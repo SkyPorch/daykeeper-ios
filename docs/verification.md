@@ -49,8 +49,21 @@ other five cases passed and the owned simulator was deleted. The debug-only
 example now waits for an explicit test-harness action after automation attaches
 before it constructs the synthetic fixture session. This hook is not part of the
 SDK or release behavior. Local run `ee3c90dd-cbff-4e55-bf9c-219441c35fcd`
-passed all six cases with that ordering and removed its exact simulator. A new
-hosted receipt remains required.
+passed all six cases with that ordering and removed its exact simulator. Hosted
+run `33615766381` then passed every gate on revision
+`ab4cda1d8d8543f48029eebdbf03badc626b09bf`, including the clean SwiftPM
+consumer and all six native UI cases, in 11 minutes 40 seconds.
+
+The concurrent stacked release-hygiene run `33615791040` independently exposed
+another fresh-runner bound: its owned simulator remained in data migration for
+more than seven minutes and reached `Waiting on System App` just before the
+readiness deadline. The fixture and app never started, and the runner still
+identity-checked and deleted only its owned simulator. Simulator readiness now
+has a ten-minute ceiling and the hosted job a 40-minute envelope so the existing
+15-minute Xcode test deadline remains independently enforceable. The shipping
+SDK request timeout is still unchanged. The new revision requires a green hosted
+receipt. Local run `1eb2fdee-147f-4bb9-8a2d-cbd4ce5a1b92` observed 42 seconds
+to readiness, passed all six native cases, and removed its exact simulator.
 
 No live gateway, production account, customer data, management credential,
 published package, release tag or production traffic was used. Hosted CI and the
