@@ -17,6 +17,12 @@ const device = await run("xcrun", ["simctl", "create", `Daykeeper-sdk-${runID}`,
 assert.match(device, /^[A-F0-9-]{36}$/i);
 console.log(JSON.stringify({ runID, device, runtime: runtime.identifier }));
 try {
+  // xcodebuild can begin the first app launch while a newly created simulator
+  // is still finishing its cold boot. Wait for this exact owned device before
+  // starting the loopback fixture so a runner delay cannot consume the SDK's
+  // intentionally short request deadline.
+  await run("xcrun", ["simctl", "boot", device], { timeout: 120_000 });
+  await run("xcrun", ["simctl", "bootstatus", device, "-b"], { timeout: 120_000 });
   await withFixture(origin => run("xcodebuild", ["test", "-project",
     "Examples/DaykeeperExample/DaykeeperExample.xcodeproj", "-scheme", "DaykeeperExample",
     "-destination", `platform=iOS Simulator,id=${device}`, "-parallel-testing-enabled", "NO",
