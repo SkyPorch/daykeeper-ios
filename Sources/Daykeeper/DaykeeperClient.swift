@@ -30,8 +30,7 @@ public final class DaykeeperClient: @unchecked Sendable {
       let scheme = components.scheme, let host = components.host, !host.isEmpty,
       components.user == nil, components.password == nil, components.query == nil,
       components.fragment == nil,
-      scheme == "https"
-        || (scheme == "http" && ["localhost", "127.0.0.1", "[::1]", "::1"].contains(host)),
+      scheme == "https" || Self.isDebugLoopback(scheme: scheme, host: host),
       timeout.isFinite, (1...60).contains(timeout)
     else { throw DaykeeperError("INVALID_CONFIGURATION") }
     var normalized = baseURL.absoluteString
@@ -195,6 +194,15 @@ public final class DaykeeperClient: @unchecked Sendable {
       error = try? values.decode(String.self, forKey: .error)
       retryable = try? values.decode(Bool.self, forKey: .retryable)
     }
+  }
+  /// Plain HTTP is a debug-only convenience for a developer's own loopback
+  /// fixture. A release build never accepts an unencrypted base URL.
+  private static func isDebugLoopback(scheme: String, host: String) -> Bool {
+    #if DEBUG
+      return scheme == "http" && ["localhost", "127.0.0.1", "[::1]", "::1"].contains(host)
+    #else
+      return false
+    #endif
   }
   private static func positive(_ value: Int64) throws {
     guard isSafeID(value) else {
