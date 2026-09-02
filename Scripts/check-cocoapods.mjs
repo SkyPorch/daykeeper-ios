@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const requiredCocoaPodsVersion = "1.16.2";
+const pod = ["pod", `_${requiredCocoaPodsVersion}_`];
 
 function run(command, args, options = {}) {
   return execFileSync(command, args, {
@@ -14,7 +15,9 @@ function run(command, args, options = {}) {
 }
 
 function readSpec(path) {
-  const raw = run("pod", ["ipc", "spec", path], { capture: true });
+  const raw = run(pod[0], [...pod.slice(1), "ipc", "spec", path], {
+    capture: true,
+  });
   return JSON.parse(raw);
 }
 
@@ -33,7 +36,9 @@ function assertCommon(spec, name) {
   assert.equal(spec.vendored_frameworks, undefined);
 }
 
-const actualCocoaPodsVersion = run("pod", ["--version"], { capture: true }).trim();
+const actualCocoaPodsVersion = run(pod[0], [...pod.slice(1), "--version"], {
+  capture: true,
+}).trim();
 assert.equal(
   actualCocoaPodsVersion,
   requiredCocoaPodsVersion,
@@ -54,7 +59,8 @@ assert.equal(ui.source_files, "Sources/DaykeeperUI/**/*.swift");
 assert.deepEqual(ui.dependencies, { Daykeeper: ["0.1.0"] });
 assert.equal(ui.resource_bundles, undefined);
 
-run("pod", [
+run(pod[0], [
+  ...pod.slice(1),
   "lib",
   "lint",
   "Daykeeper.podspec",
@@ -63,7 +69,8 @@ run("pod", [
   "--fail-fast",
   "--no-ansi",
 ]);
-run("pod", [
+run(pod[0], [
+  ...pod.slice(1),
   "lib",
   "lint",
   "DaykeeperUI.podspec",

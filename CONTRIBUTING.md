@@ -31,7 +31,8 @@ fails closed without connecting anywhere. Regenerate the checked-in project with
 `xcodegen generate --spec Examples/DaykeeperExample/project.yml` after changing
 the project specification; review generated changes for local paths.
 
-The CocoaPods check requires exactly CocoaPods 1.16.2. It parses both podspecs,
+The CocoaPods check requires the CocoaPods 1.16.2 gem and invokes that version
+explicitly with RubyGems' version selector. It parses both podspecs,
 rejects metadata drift or release scripts, then uses `pod lib lint` to compile a
 clean core consumer and a separate UI consumer with the exact local core spec.
 It never pushes a pod or uses a trunk token.

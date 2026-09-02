@@ -47,6 +47,10 @@ jobs:
           xcodebuild -version
           swift --version
           pod --version
+      - name: Install minimum supported CocoaPods
+        run: |
+          gem install cocoapods --version 1.16.2 --no-document
+          pod _1.16.2_ --version
       - run: node Scripts/check-contract.mjs
       - run: swift format lint --strict --recursive Package.swift Sources Tests Examples
       - run: swift test --skip WireTests -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors
