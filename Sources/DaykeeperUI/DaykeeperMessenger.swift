@@ -1,6 +1,12 @@
 import Daykeeper
 import SwiftUI
 
+/// Every user-facing string lives in this package's `Localizable.strings`.
+/// English is the base language; nothing here is composed from raw literals.
+internal func daykeeperText(_ key: String.LocalizationValue) -> String {
+  String(localized: key, bundle: .module)
+}
+
 /// Present as a sheet or embed in your app. No global presenter, tracking,
 /// swizzling, web view, cookie jar, credential store or remote asset loading.
 public struct DaykeeperMessenger: View {
@@ -13,65 +19,78 @@ public struct DaykeeperMessenger: View {
   public init(session: DaykeeperMessengerSession) { self.session = session }
 
   public var body: some View {
-    NavigationView {
-      Group {
-        if session.isSignedOut {
-          Text("Sign in to your app to use support.").padding()
-        } else if session.isSuspended {
-          Text("Support is paused while the app is inactive.").padding()
-        } else {
-          VStack(spacing: 0) {
-            status
-            if session.selectedConversationID != nil { thread } else { conversationList }
-          }
+    container
+      .task { await session.resume() }
+      .onDisappear { session.suspend() }
+      .onChange(of: scenePhase) { phase in
+        if phase == .active { Task { await session.resume() } } else { session.suspend() }
+      }
+      .alert(daykeeperText("daykeeper.discard.title"), isPresented: $discardConfirmation) {
+        Button(daykeeperText("daykeeper.discard.keep"), role: .cancel) {}
+        Button(daykeeperText("daykeeper.discard.confirm"), role: .destructive) {
+          session.discardUncertainDraft()
+        }
+      } message: {
+        Text(daykeeperText("daykeeper.discard.message"))
+      }
+      .alert(daykeeperText("daykeeper.creation.title"), isPresented: $creationConfirmation) {
+        Button(daykeeperText("daykeeper.creation.keep"), role: .cancel) {}
+        Button(daykeeperText("daykeeper.creation.confirm")) {
+          session.acknowledgeUncertainCreationAfterReview()
+        }
+      } message: {
+        Text(daykeeperText("daykeeper.creation.message"))
+      }
+  }
+
+  /// `NavigationView` is deprecated. Use the stack on the systems that have it
+  /// and keep the iOS 15 / macOS 12 fallback for the package's floor.
+  @ViewBuilder private var container: some View {
+    if #available(iOS 16.0, macOS 13.0, *) {
+      NavigationStack { chrome }
+    } else {
+      NavigationView { chrome }.daykeeperLegacyNavigationStyle()
+    }
+  }
+
+  private var chrome: some View {
+    Group {
+      if session.isSignedOut {
+        Text(daykeeperText("daykeeper.signed_out")).padding()
+      } else if session.isSuspended {
+        Text(daykeeperText("daykeeper.suspended")).padding()
+      } else {
+        VStack(spacing: 0) {
+          status
+          if session.selectedConversationID != nil { thread } else { conversationList }
         }
       }
-      .navigationTitle("Support")
-      .toolbar {
-        #if os(iOS)
-          ToolbarItemGroup(placement: .keyboard) {
-            Spacer()
-            Button("Done") { isEditing = false }.accessibilityIdentifier("daykeeper.done-editing")
-          }
-        #endif
-        ToolbarItemGroup(placement: .automatic) {
-          if session.selectedConversationID != nil {
-            Button("Conversations") { session.showConversations() }
-              .disabled(session.isBusy).accessibilityIdentifier("daykeeper.conversations")
-          }
-          Button("Refresh") { Task { await session.refresh() } }
-            .disabled(session.isBusy || session.isSignedOut || session.isSuspended)
-            .accessibilityIdentifier("daykeeper.refresh")
+    }
+    .navigationTitle(daykeeperText("daykeeper.title"))
+    .toolbar {
+      #if os(iOS)
+        ToolbarItemGroup(placement: .keyboard) {
+          Spacer()
+          Button(daykeeperText("daykeeper.done_editing")) { isEditing = false }
+            .accessibilityIdentifier("daykeeper.done-editing")
         }
+      #endif
+      ToolbarItemGroup(placement: .automatic) {
+        if session.selectedConversationID != nil {
+          Button(daykeeperText("daykeeper.conversations")) { session.showConversations() }
+            .disabled(session.isBusy).accessibilityIdentifier("daykeeper.conversations")
+        }
+        Button(daykeeperText("daykeeper.refresh")) { Task { await session.refresh() } }
+          .disabled(session.isBusy || session.isSignedOut || session.isSuspended)
+          .accessibilityIdentifier("daykeeper.refresh")
       }
-    }
-    .daykeeperNavigationStyle()
-    .task { await session.resume() }
-    .onDisappear { session.suspend() }
-    .onChange(of: scenePhase) { phase in
-      if phase == .active { Task { await session.resume() } } else { session.suspend() }
-    }
-    .alert("Discard this draft?", isPresented: $discardConfirmation) {
-      Button("Keep draft", role: .cancel) {}
-      Button("Discard draft", role: .destructive) { session.discardUncertainDraft() }
-    } message: {
-      Text(
-        "The earlier message may already have been sent. Review the conversation first. Discarding this draft cannot undo a sent message."
-      )
-    }
-    .alert("Finished reviewing conversations?", isPresented: $creationConfirmation) {
-      Button("Keep reviewing", role: .cancel) {}
-      Button("I have reviewed the list") { session.acknowledgeUncertainCreationAfterReview() }
-    } message: {
-      Text(
-        "The earlier conversation may already exist. This only enables starting a new conversation; it does not repeat or undo the earlier request."
-      )
     }
   }
 
   @ViewBuilder private var status: some View {
     if session.isBusy {
-      ProgressView("Updating support…").padding().accessibilityIdentifier("daykeeper.progress")
+      ProgressView(daykeeperText("daykeeper.progress")).padding()
+        .accessibilityIdentifier("daykeeper.progress")
     }
     if let error = session.error {
       Text(message(for: error))
@@ -79,11 +98,9 @@ public struct DaykeeperMessenger: View {
         .accessibilityIdentifier("daykeeper.error")
     }
     if session.uncertainCreation {
-      Text(
-        "We could not confirm the new conversation. Refresh and inspect existing conversations before starting another. No request was automatically repeated."
-      )
-      .font(.callout).padding()
-      Button("Finish reviewing conversations") { creationConfirmation = true }
+      Text(daykeeperText("daykeeper.uncertain_creation.body"))
+        .font(.callout).padding()
+      Button(daykeeperText("daykeeper.uncertain_creation.button")) { creationConfirmation = true }
         .disabled(!session.canAcknowledgeUncertainCreation).padding(.bottom)
     }
   }
@@ -91,27 +108,36 @@ public struct DaykeeperMessenger: View {
   private var conversationList: some View {
     List {
       if session.conversations.isEmpty && !session.isBusy {
-        Text("No conversations yet.").foregroundStyle(.secondary)
+        Text(daykeeperText("daykeeper.no_conversations")).foregroundStyle(.secondary)
       }
       ForEach(session.conversations) { conversation in
         Button {
           Task { await session.selectConversation(conversation.id) }
         } label: {
           VStack(alignment: .leading, spacing: 4) {
-            Text(conversation.preview ?? "Conversation \(conversation.id)").lineLimit(2)
-              .foregroundStyle(.primary)
+            Text(
+              conversation.preview
+                ?? String(
+                  format: daykeeperText("daykeeper.conversation_fallback"), conversation.id)
+            )
+            .lineLimit(2).foregroundStyle(.primary)
             Text(
               conversation.unreadForContact > 0
-                ? "\(conversation.unreadForContact) unread" : conversation.status
+                ? String(
+                  format: daykeeperText("daykeeper.unread_count"),
+                  Int64(conversation.unreadForContact))
+                : conversation.status
             )
             .font(.caption).foregroundStyle(Color.secondary)
           }.padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
         }.disabled(session.isBusy)
           .accessibilityIdentifier("daykeeper.conversation.\(conversation.id)")
       }
-      Button("New conversation") { Task { await session.createConversation() } }
-        .disabled(session.isBusy || session.uncertainCreation)
-        .accessibilityIdentifier("daykeeper.new-conversation")
+      Button(daykeeperText("daykeeper.new_conversation")) {
+        Task { await session.createConversation() }
+      }
+      .disabled(session.isBusy || session.uncertainCreation)
+      .accessibilityIdentifier("daykeeper.new-conversation")
     }
   }
 
@@ -120,15 +146,27 @@ public struct DaykeeperMessenger: View {
       ScrollViewReader { proxy in
         ScrollView {
           LazyVStack(alignment: .leading, spacing: 16) {
+            if session.canLoadEarlierMessages {
+              Button(daykeeperText("daykeeper.load_earlier")) {
+                Task { await session.loadEarlierMessages() }
+              }
+              .disabled(session.isBusy)
+              .accessibilityIdentifier("daykeeper.load-earlier")
+            }
             ForEach(session.messages) { item in
               VStack(alignment: .leading, spacing: 6) {
-                Text(item.messageType == 0 ? "You" : item.sender?.name ?? "Support").font(.caption)
-                  .bold()
+                Text(
+                  item.messageType == 0
+                    ? daykeeperText("daykeeper.sender.you")
+                    : item.sender?.name ?? daykeeperText("daykeeper.sender.support")
+                ).font(.caption).bold()
                 Text(item.content ?? "").textSelection(.enabled)
                   .accessibilityIdentifier("daykeeper.message.\(item.id)")
                 if !item.attachments.isEmpty {
                   Text(
-                    "This message includes \(item.attachments.count) attachment(s). Attachment viewing is not available in this SDK candidate."
+                    String(
+                      format: daykeeperText("daykeeper.attachments"),
+                      Int64(item.attachments.count))
                   )
                   .font(.caption).foregroundStyle(.secondary)
                 }
@@ -151,11 +189,9 @@ public struct DaykeeperMessenger: View {
       Divider()
       if let id = session.selectedConversationID, session.uncertainThreads.contains(id) {
         VStack(alignment: .leading) {
-          Text(
-            "Your message may have been sent. The draft is preserved. Refresh and review history; it will not be sent again automatically."
-          ).font(.callout)
-          Button("Discard draft after review") { discardConfirmation = true }.disabled(
-            !session.canDiscardUncertainDraft)
+          Text(daykeeperText("daykeeper.uncertain_thread.body")).font(.callout)
+          Button(daykeeperText("daykeeper.uncertain_thread.button")) { discardConfirmation = true }
+            .disabled(!session.canDiscardUncertainDraft)
         }.padding()
       }
       HStack(alignment: .bottom) {
@@ -163,42 +199,36 @@ public struct DaykeeperMessenger: View {
           .focused($isEditing)
           .frame(minHeight: 48, maxHeight: 120).border(Color.secondary.opacity(0.3))
           .disabled(!session.canEditDraft)
-          .accessibilityLabel("Message").accessibilityIdentifier("daykeeper.message")
-        Button("Send") {
+          .accessibilityLabel(daykeeperText("daykeeper.composer"))
+          .accessibilityIdentifier("daykeeper.message")
+        Button(daykeeperText("daykeeper.send")) {
           isEditing = false
           Task { await session.sendMessage() }
         }
         .disabled(!session.canSend).accessibilityIdentifier("daykeeper.send")
       }.padding()
-      Button("Mark conversation read") { Task { await session.markRead() } }.disabled(
-        session.isBusy
-      ).padding(.bottom).accessibilityIdentifier("daykeeper.mark-read")
+      Button(daykeeperText("daykeeper.mark_read")) { Task { await session.markRead() } }
+        .disabled(session.isBusy).padding(.bottom)
+        .accessibilityIdentifier("daykeeper.mark-read")
     }
   }
 
   private func message(for error: DaykeeperError) -> String {
-    if error.outcomeUnknown {
-      return "The result could not be confirmed. Review history before trying another write."
-    }
+    if error.outcomeUnknown { return daykeeperText("daykeeper.error.outcome_unknown") }
     switch error.code {
-    case "daykeeper_usage_limit_exceeded":
-      return
-        "Support has reached its current allowance. Contact the workspace owner. Existing history remains available."
+    case "daykeeper_usage_limit_exceeded": return daykeeperText("daykeeper.error.usage_limit")
     case "daykeeper_usage_not_enabled", "daykeeper_support_not_ready":
-      return "This support inbox is not ready yet. Contact the workspace owner."
-    case "REQUEST_TIMEOUT", "NETWORK_ERROR":
-      return "Support could not be reached. Check your connection and refresh."
-    case "REQUEST_ABORTED": return "The request was canceled."
-    case "TOKEN_PROVIDER_ERROR":
-      return "Your app could not confirm your support session. Sign in again."
-    default:
-      return "Support could not complete that request. Refresh your session before trying again."
+      return daykeeperText("daykeeper.error.not_ready")
+    case "REQUEST_TIMEOUT", "NETWORK_ERROR": return daykeeperText("daykeeper.error.unreachable")
+    case "REQUEST_ABORTED": return daykeeperText("daykeeper.error.canceled")
+    case "TOKEN_PROVIDER_ERROR": return daykeeperText("daykeeper.error.token_provider")
+    default: return daykeeperText("daykeeper.error.default")
     }
   }
 }
 
 extension View {
-  @ViewBuilder fileprivate func daykeeperNavigationStyle() -> some View {
+  @ViewBuilder fileprivate func daykeeperLegacyNavigationStyle() -> some View {
     #if os(iOS)
       self.navigationViewStyle(.stack)
     #else
