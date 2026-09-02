@@ -64,7 +64,12 @@ const server = createServer(async (request, response) => {
   if (path === "/v1/conversations/7/messages") {
     const historyKey = `${key}-${customer}`;
     const history = histories.get(historyKey) ?? (key.startsWith("new") ? [] : [message(`Hello from support for customer ${customer}`)]); histories.set(historyKey,history);
-    if (request.method === "GET") return json(200,{messages:history});
+    if (request.method === "GET") {
+      const raw = url.searchParams.get("after");
+      const after = raw === null ? null : Number(raw);
+      if (after !== null && (!Number.isSafeInteger(after) || after < 1)) return json(400,{error:"not_found"});
+      return json(200,{messages: after === null ? history : history.filter(item => item.id > after)});
+    }
     receipt.sends++;
     if(key.startsWith("quota"))return json(429,{error:"daykeeper_usage_limit_exceeded",retryable:false});
     let body="";

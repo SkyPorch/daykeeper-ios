@@ -3,7 +3,9 @@ import XCTest
 @testable import Daykeeper
 
 /// Requires the dedicated loopback fixture. CI runs these separately with its
-/// exact fresh port; normal unit tests do not silently contact a remote gateway.
+/// exact fresh port. A plain `swift test` starts the same node harness itself
+/// when node is available, and otherwise skips with a pointer to the script;
+/// nothing here ever contacts a remote gateway.
 final class WireTests: XCTestCase {
   private actor Gate {
     var started = false
@@ -26,18 +28,11 @@ final class WireTests: XCTestCase {
     let cookies: [Bool]
     let methods: [String]
   }
-  private func origin() throws -> URL {
-    guard let value = ProcessInfo.processInfo.environment["DAYKEEPER_TEST_ORIGIN"] else {
-      throw XCTSkip("Run Scripts/check-wire.mjs for real URLSession checks")
-    }
-    guard let url = URL(string: value), url.scheme == "http", url.host == "127.0.0.1",
-      url.port != nil,
-      url.path.isEmpty, url.query == nil, url.fragment == nil, url.user == nil, url.password == nil
-    else {
-      throw NSError(domain: "Invalid isolated fixture", code: 1)
-    }
-    return url
+  override class func tearDown() {
+    WireFixture.stop()
+    super.tearDown()
   }
+  private func origin() throws -> URL { try WireFixture.origin() }
   private func caseURL(_ mode: String) throws -> (URL, String) {
     let key = "\(mode)-\(UUID().uuidString.lowercased())"
     return (try origin().appendingPathComponent("cases/\(key)"), key)
@@ -51,6 +46,20 @@ final class WireTests: XCTestCase {
     let (data, _) = try await session.data(from: components.url!)
     return try JSONDecoder().decode(Receipt.self, from: data)
   }
+  func testMessageCursorReachesTheGatewayAndReturnsOnlyNewerMessages() async throws {
+    let (url, _) = try caseURL("cursor")
+    let client = try DaykeeperClient(baseURL: url) { _ in "fixture-a" }
+    let first = try await client.listMessages(in: 7)
+    XCTAssertEqual(first.messages.map(\.id), [9])
+    let sent = try await client.sendMessage(in: 7, content: "Second")
+    let newer = try await client.listMessages(in: 7, after: 9)
+    XCTAssertEqual(newer.messages.map(\.id), [sent.message.id])
+    let repeated = try await client.listMessages(in: 7, after: sent.message.id)
+    XCTAssertTrue(repeated.messages.isEmpty, "A caught-up cursor must return nothing")
+    let full = try await client.listMessages(in: 7)
+    XCTAssertEqual(full.messages.count, 2)
+  }
+
   func testRedirectTargetsAreNeverReachedIncluding307And308() async throws {
     for status in [301, 302, 303, 307, 308] {
       let (url, key) = try caseURL("redirect\(status)")
@@ -226,5 +235,89 @@ final class WireTests: XCTestCase {
       XCTAssertEqual(result.hits, 1)
       XCTAssertEqual(result.methods, ["POST"])
     }
+  }
+}
+
+/// `swift test` on its own still exercises the real URLSession stack: if the
+/// node harness is present the loopback fixture is started here, and if it is
+/// not the wire tests skip with an explicit pointer to Scripts/check-wire.mjs.
+/// CI keeps passing DAYKEEPER_TEST_ORIGIN, which always wins.
+internal enum WireFixture {
+  private static let lock = NSLock()
+  nonisolated(unsafe) private static var process: Process?
+  nonisolated(unsafe) private static var resolved: Result<URL, Error>?
+
+  static func origin() throws -> URL {
+    if let value = ProcessInfo.processInfo.environment["DAYKEEPER_TEST_ORIGIN"] {
+      return try validate(value)
+    }
+    lock.lock()
+    defer { lock.unlock() }
+    if let resolved { return try resolved.get() }
+    let outcome: Result<URL, Error>
+    do { outcome = .success(try launch()) } catch { outcome = .failure(error) }
+    resolved = outcome
+    return try outcome.get()
+  }
+
+  static func stop() {
+    lock.lock()
+    defer { lock.unlock() }
+    if let process, process.isRunning { process.terminate() }
+    process = nil
+    resolved = nil
+  }
+
+  private static func validate(_ value: String) throws -> URL {
+    guard let url = URL(string: value), url.scheme == "http", url.host == "127.0.0.1",
+      url.port != nil,
+      url.path.isEmpty, url.query == nil, url.fragment == nil, url.user == nil, url.password == nil
+    else {
+      throw NSError(domain: "Invalid isolated fixture", code: 1)
+    }
+    return url
+  }
+
+  private static func launch() throws -> URL {
+    let root = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let harness = root.appendingPathComponent("Tests/Fixtures/server.mjs")
+    guard FileManager.default.fileExists(atPath: harness.path) else {
+      throw XCTSkip(
+        "Wire tests need Tests/Fixtures/server.mjs; run node Scripts/check-wire.mjs instead")
+    }
+    let task = Process()
+    task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    task.arguments = ["node", harness.path]
+    task.currentDirectoryURL = root
+    let pipe = Pipe()
+    task.standardOutput = pipe
+    do {
+      try task.run()
+    } catch {
+      throw XCTSkip(
+        "Wire tests need node on PATH to start Tests/Fixtures/server.mjs; "
+          + "run node Scripts/check-wire.mjs instead")
+    }
+    process = task
+    var buffer = Data()
+    let deadline = Date().addingTimeInterval(60)
+    while !buffer.contains(UInt8(ascii: "\n")), Date() < deadline {
+      let chunk = pipe.fileHandleForReading.availableData
+      if chunk.isEmpty { break }
+      buffer.append(chunk)
+    }
+    guard let newline = buffer.firstIndex(of: UInt8(ascii: "\n")),
+      let line = String(data: buffer[..<newline], encoding: .utf8),
+      let payload = try? JSONDecoder().decode([String: String].self, from: Data(line.utf8)),
+      let value = payload["origin"]
+    else {
+      if task.isRunning { task.terminate() }
+      process = nil
+      throw XCTSkip(
+        "Tests/Fixtures/server.mjs did not report a loopback origin; "
+          + "run node Scripts/check-wire.mjs instead")
+    }
+    return try validate(value)
   }
 }
