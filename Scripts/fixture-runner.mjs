@@ -32,7 +32,7 @@ export async function withFixture(action) {
   let timer;
   try {
     const ready = await new Promise((resolve, reject) => {
-      timer = setTimeout(() => reject(new Error("Fixture startup timed out")), 10_000);
+      timer = setTimeout(() => reject(new Error("Fixture startup timed out")), 60_000);
       reader.once("line", line => {
         try { resolve(JSON.parse(line)); } catch (error) { reject(error); }
       });

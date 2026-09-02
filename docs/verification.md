@@ -65,6 +65,18 @@ SDK request timeout is still unchanged. The new revision requires a green hosted
 receipt. Local run `1eb2fdee-147f-4bb9-8a2d-cbd4ce5a1b92` observed 42 seconds
 to readiness, passed all six native cases, and removed its exact simulator.
 
+Hosted run `33617465970` passed every gate on revision
+`2cd3c576ee3c44e5978ba28384ca882098845044` in 9 minutes 29 seconds. Its
+concurrent stacked release-hygiene run `33617496403` completed simulator
+readiness in 4 minutes 51 seconds, then exposed a separate ten-second local
+fixture-startup bound under hosted runner contention. The fixture and app never
+exchanged a request, and the runner removed only its owned simulator. Fixture
+startup now has a one-minute ceiling inside the independently bounded native
+test and job envelopes. Production startup and request deadlines remain
+unchanged. Local run `30652734-fe43-4211-84ef-235acca409f3` passed all six
+native cases and removed its exact simulator. The new revision requires a green
+hosted receipt.
+
 No live gateway, production account, customer data, management credential,
 published package, release tag or production traffic was used. Hosted CI and the
 remaining [release gates](../COMPATIBILITY.md) must pass before shipping. External
