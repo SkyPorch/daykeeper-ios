@@ -42,6 +42,14 @@ final class MessengerTests: XCTestCase {
     input.typeText(content)
   }
 
+  @MainActor private func confirmAlert(_ title: String, action: String) {
+    let alert = app.alerts[title]
+    XCTAssertTrue(alert.waitForExistence(timeout: 10))
+    let button = alert.buttons[action]
+    XCTAssertTrue(button.waitForExistence(timeout: 5))
+    button.tap()
+  }
+
   @MainActor private func counters() async throws -> [String: Int] {
     let origin = try XCTUnwrap(ProcessInfo.processInfo.environment["DAYKEEPER_TEST_ORIGIN"])
     let url = try XCTUnwrap(URL(string: "\(origin)/fixture/receipt?case=\(key)"))
@@ -112,7 +120,7 @@ final class MessengerTests: XCTestCase {
     XCTAssertTrue(app.buttons["Discard draft after review"].isEnabled)
     snapshot("uncertain-message-after-refresh")
     app.buttons["Discard draft after review"].tap()
-    app.alerts.buttons["Discard draft"].tap()
+    confirmAlert("Discard this draft?", action: "Discard draft")
     XCTAssertEqual(input.value as? String, "")
     XCTAssertFalse(app.buttons["daykeeper.send"].isEnabled)
     let receipt = try await counters()
@@ -169,7 +177,7 @@ final class MessengerTests: XCTestCase {
     XCTAssertTrue(app.buttons["Finish reviewing conversations"].isEnabled)
     snapshot("uncertain-creation-after-refresh")
     app.buttons["Finish reviewing conversations"].tap()
-    app.alerts.buttons["I have reviewed the list"].tap()
+    confirmAlert("Finished reviewing conversations?", action: "I have reviewed the list")
     XCTAssertTrue(app.buttons["daykeeper.new-conversation"].isEnabled)
     let receipt = try await counters()
     XCTAssertEqual(receipt["creates"], 1)
