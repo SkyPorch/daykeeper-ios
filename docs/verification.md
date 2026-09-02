@@ -61,9 +61,9 @@ readiness deadline. The fixture and app never started, and the runner still
 identity-checked and deleted only its owned simulator. Simulator readiness now
 has a ten-minute ceiling and the hosted job a 40-minute envelope so the existing
 15-minute Xcode test deadline remains independently enforceable. The shipping
-SDK request timeout is still unchanged. The new revision requires a green hosted
-receipt. Local run `1eb2fdee-147f-4bb9-8a2d-cbd4ce5a1b92` observed 42 seconds
-to readiness, passed all six native cases, and removed its exact simulator.
+SDK request timeout remained unchanged. Local run
+`1eb2fdee-147f-4bb9-8a2d-cbd4ce5a1b92` observed 42 seconds to readiness, passed
+all six native cases, and removed its exact simulator.
 
 Hosted run `33617465970` passed every gate on revision
 `2cd3c576ee3c44e5978ba28384ca882098845044` in 9 minutes 29 seconds. Its
@@ -74,8 +74,16 @@ exchanged a request, and the runner removed only its owned simulator. Fixture
 startup now has a one-minute ceiling inside the independently bounded native
 test and job envelopes. Production startup and request deadlines remain
 unchanged. Local run `30652734-fe43-4211-84ef-235acca409f3` passed all six
-native cases and removed its exact simulator. The new revision requires a green
-hosted receipt.
+native cases and removed its exact simulator.
+
+Hosted run `33618925444` passed every gate on functional revision
+`1de222d36a9ae6e97a782e39bde56f69069599fc`, including the clean SwiftPM
+consumer and all six native UI cases, in 9 minutes 2 seconds. Stacked run
+`33618950990` passed checksum-pinned full-history scanning and the same complete
+native suite on release-hygiene revision
+`cf5c23ad3f84b2e35c81ed7763d04d7d9d9881a8` in 10 minutes 28 seconds. Any
+later documentation-only revision remains subject to required CI and does not
+waive the remaining release gates.
 
 No live gateway, production account, customer data, management credential,
 published package, release tag or production traffic was used. Hosted CI and the
