@@ -11,21 +11,30 @@ certification is implied by the source or CI checks.
 | SwiftPM | Headless and SwiftUI products; native example imports the package | Approved tag and external clean tagged-install receipt |
 | Customer API | Eight operations, typed decoding, safe errors, prefix routing | Deployed tenant/gateway contract parity |
 | Transport | Real URLSession redirect, cookie/cache isolation, token refresh, stream/deadline/cancellation and write-attempt tests | TLS chain, proxy/load-balancer and physical-network matrix |
-| Native messenger | List/history/plain-text send/seen, drafts, logout, account switching and fresh-read recovery guards | Full support feature parity and current-head native rerun |
+| Native messenger | List/history/plain-text send/seen, drafts, logout, account switching and fresh-read recovery guards | Full support feature parity beyond the tested customer-support core |
 | Lifecycle | Background masking, draft preservation, late-result fencing | Physical-device/app-switcher privacy verification |
 | UI | iPhone simulator; light/dark and one accessibility text size | iPad, landscape, small-screen and full VoiceOver/Dynamic Type matrix |
 | Deployment | iOS 15 declared; generic simulator build | iOS 15 minimum-runtime and older compiler certification |
 
-Local baseline: Xcode 26.6, Swift 6.3.3, 24 macOS-hosted strict-concurrency unit
-tests and 8 isolated loopback wire tests. A prior candidate revision passed the
-six iOS 26.5 simulator UI cases. The fresh-read recovery revision still requires
-a completed native rerun: its first isolated run was interrupted by host disk
-pressure after three cases passed, and a retry could not create a simulator while
-CoreSimulatorService was unavailable. This is an environment failure, not a test
-assertion, but it is not passing evidence. The minimum Swift tools version is
-a package declaration, not a claim that Swift 5.9 has been runtime-certified.
-The macOS 12 target supports development/testing; this candidate is not marketed
-as a certified macOS messenger. Swift 6 language mode is not yet certified.
+Local baseline for revision `7c507a5102209eb06902308327f43071bf5b4a6d`, recorded
+on 2026-09-02: Xcode 26.6, Swift 6.3.3, 24 macOS-hosted strict-concurrency unit
+tests, 8 isolated loopback wire tests, a generic iOS 15 simulator build, and all
+6 iOS 26.5 simulator UI cases passed. The native cases covered account-switch
+isolation, first conversation and send, unread/seen/sign-out, quota preservation,
+and fresh-read recovery after uncertain message and conversation writes. The
+result bundle remains local and contains synthetic fixture data only; it is not a
+portable hosted receipt or live-gateway certification.
+
+The GitHub Actions checks for PRs 1 and 2 currently fail before any workflow step
+starts because the SkyPorch account reports a payment or spending-limit problem.
+No test assertion ran or failed in those hosted jobs. Restore Actions billing and
+rerun both PR heads before treating either check as passing. Local evidence does
+not replace that hosted gate.
+
+The minimum Swift tools version is a package declaration, not a claim that Swift
+5.9 has been runtime-certified. The macOS 12 target supports development/testing;
+this candidate is not marketed as a certified macOS messenger. Swift 6 language
+mode is not yet certified.
 
 The native example is designed to use a fresh loopback fixture and a new simulator per run.
 It never uses an existing device, real customer token, live inbox, or production
