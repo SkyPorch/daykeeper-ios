@@ -20,8 +20,10 @@ through the exact bounded alert action without repeating either write.
 The complete run used a newly created isolated simulator and a loopback fixture.
 All six native cases passed, the result bundle was retained locally, and the
 runner identity-checked and removed only its owned simulator. Existing user
-simulators were not used or modified. The hosted PR 3 head still must rerun green;
-the local result is not a portable hosted receipt.
+simulators were not used or modified. Hosted PR 3 revision
+`09b4af6177a61cd6a930e67beed1826f968276bb` also passed the package, wire,
+generic-build and native gates in run `33608243470`. Neither fixture result is
+live-gateway or physical-device certification.
 
 No live gateway, production account, customer data, management credential,
 published package, release tag or production traffic was used. Hosted CI and the

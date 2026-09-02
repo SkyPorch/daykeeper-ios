@@ -30,8 +30,10 @@ because the SkyPorch account reported a payment or spending-limit problem. A
 later PR 3 run reached the native suite and exposed an unbounded confirmation-
 alert lookup in one uncertain-write UI case. Revision `fa4963f` now waits for the
 exact alert and action in both confirmation paths; the complete local suite is
-green on that revision. The updated hosted PR 3 head must still rerun green.
-Local evidence does not replace that hosted gate.
+green on that revision. Hosted PR 3 revision
+`09b4af6177a61cd6a930e67beed1826f968276bb` then passed every job step, including
+the full native suite, in run `33608243470`. This hosted fixture result does not
+replace the remaining live-gateway and physical-device gates.
 
 The minimum Swift tools version is a package declaration, not a claim that Swift
 5.9 has been runtime-certified. The macOS 12 target supports development/testing;
