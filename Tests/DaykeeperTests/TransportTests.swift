@@ -299,4 +299,166 @@ final class TransportTests: XCTestCase {
     XCTAssertLessThan(Date().timeIntervalSince(start), 3)
     XCTAssertEqual(stub.requests.count, 1)
   }
+
+  /// Every error code the Daykeeper support gateway can put in the customer
+  /// `{ "error": ... }` envelope, copied from `test/errorCodes.test.ts` in
+  /// SkyPorch/daykeeper-react-native#14 so the three SDKs agree on exactly one
+  /// projection rule. Consuming apps switch on these, so every one must arrive
+  /// unchanged.
+  private static let gatewayErrorCodes = [
+    // auth.mjs — SupportAuthError, 401 unless noted
+    "missing_bearer_token", "invalid_bearer_token", "invalid_token", "invalid_tenant",
+    "unsupported_token", "invalid_signature", "invalid_issuer", "invalid_audience",
+    "invalid_subject", "invalid_expiration", "expired_token", "token_lifetime_too_long",
+    // server.mjs
+    "unknown_tenant", "insufficient_scope", "erasure_targets_do_not_match_token",
+    "unknown_campaign", "widget_token_required", "not_found", "support_upstream_rejected",
+    "support_upstream_unavailable",
+    // Codes the customer app still switches on from the pre-gateway support
+    // stack and from services in front of the gateway. The contract calls codes
+    // extensible and the SDK must not decide which ones are real.
+    "support_gateway_request_failed", "conversation_not_found",
+    "daykeeper_usage_limit_exceeded", "daykeeper_usage_not_enabled",
+    "daykeeper_support_not_ready", "daykeeper_resource_conflict",
+    "daykeeper_support_unavailable", "rate_limited",
+  ]
+
+  func testEveryGatewayErrorCodeReachesTheCallerUnchanged() async throws {
+    XCTAssertEqual(Self.gatewayErrorCodes.count, 28)
+    XCTAssertEqual(Set(Self.gatewayErrorCodes).count, Self.gatewayErrorCodes.count)
+    for code in Self.gatewayErrorCodes {
+      let stub = Stub([.json(403, ["error": code])])
+      do {
+        _ = try await stub.client().getUnread()
+        XCTFail("Expected \(code) to surface")
+      } catch {
+        XCTAssertEqual((error as? DaykeeperError)?.code, code)
+      }
+      XCTAssertTrue(DaykeeperError.isSafeCode(code), code)
+    }
+  }
+
+  func testCodeShapeRuleAcceptsOnlyCodeShapedStrings() throws {
+    for value in ["abc", "not_found", "a1_b2_c3", String(repeating: "a", count: 64), "ab0"] {
+      XCTAssertTrue(DaykeeperError.isSafeCode(value), value)
+    }
+    for value in [
+      "ab", String(repeating: "a", count: 65), "", "Not_Found", "not-found", "not found",
+      " not_found", "not_found\n", "_not_found", "1not_found", "not_found\u{0000}", "nöt_found",
+    ] {
+      XCTAssertFalse(DaykeeperError.isSafeCode(value), value)
+    }
+  }
+
+  func testACodeTheSDKHasNeverSeenIsStillHandedToTheCaller() async throws {
+    // The gateway can ship a new code before the SDK does; that must not become
+    // a silent contract break in the consuming app's switch statement.
+    for code in ["support_brand_new_condition", "invalid_future_claim", "ab0"] {
+      let stub = Stub([.json(400, ["error": code])])
+      do {
+        _ = try await stub.client().getUnread()
+        XCTFail("Expected \(code) to surface")
+      } catch {
+        XCTAssertEqual((error as? DaykeeperError)?.code, code)
+      }
+    }
+  }
+
+  func testProseAndNonStringErrorValuesCollapse() async throws {
+    // server.mjs answers some 4xx failures with `error: <Error.message>` rather
+    // than a code. Those are English sentences and never reach the caller, and
+    // neither does a value that is not a JSON string at all.
+    let values: [Any] = [
+      "Payload too large", "Invalid JSON", "At least one erasure target is required",
+      "At most 100 erasure targets are allowed", "Each erasure target needs a userId or email",
+      "Message content is required", "Conversation not found",
+      ["support_upstream_rejected"], ["code": "support_upstream_rejected"], 42, true,
+      NSNull(),
+    ]
+    for value in values {
+      let stub = Stub([.json(400, ["error": value])])
+      do {
+        _ = try await stub.client().getUnread()
+        XCTFail("Expected a rejection")
+      } catch {
+        XCTAssertEqual((error as? DaykeeperError)?.code, "daykeeper_request_failed")
+      }
+    }
+  }
+
+  func testTheContractMessageFieldNeverBecomesTheErrorMessage() async throws {
+    let prose = "You have used your included conversations for August."
+    let stub = Stub([
+      .json(
+        429,
+        [
+          "error": "daykeeper_usage_limit_exceeded", "message": prose, "retryable": false,
+          "nextAction": "review_usage",
+        ])
+    ])
+    do {
+      _ = try await stub.client().getUnread()
+      XCTFail("Expected a rejection")
+    } catch {
+      let safe = try XCTUnwrap(error as? DaykeeperError)
+      XCTAssertEqual(safe.code, "daykeeper_usage_limit_exceeded")
+      XCTAssertEqual(safe.description, "daykeeper_usage_limit_exceeded")
+      // Honor an explicit server veto: a 429 is not automatically retryable
+      // when the server says not to replay it.
+      XCTAssertFalse(safe.retryable)
+      XCTAssertEqual(safe.nextAction, .reviewUsage)
+      let encoded = try XCTUnwrap(String(data: JSONEncoder().encode(safe), encoding: .utf8))
+      XCTAssertFalse(encoded.contains("August"))
+    }
+  }
+
+  func testNextActionIsProjectedThroughAClosedAllowlist() async throws {
+    for (raw, expected) in [
+      ("review_usage", DaykeeperNextAction.reviewUsage),
+      ("review_setup", .reviewSetup),
+      ("refresh_conversation", .refreshConversation),
+    ] {
+      let stub = Stub([.json(429, ["error": "daykeeper_usage_limit_exceeded", "nextAction": raw])])
+      do {
+        _ = try await stub.client().getUnread()
+        XCTFail("Expected a rejection")
+      } catch {
+        XCTAssertEqual((error as? DaykeeperError)?.nextAction, expected)
+      }
+    }
+  }
+
+  func testAnUnrecognizedOrAbsentNextActionIsDropped() async throws {
+    // Unlike a code, a next action is an instruction the app acts on, so the
+    // vocabulary stays closed: an unknown hint is dropped, not surfaced.
+    let values: [Any] = [
+      "review_billing", "contact_support", "Review_Usage", "review usage", "",
+      ["review_usage"], 42, true, NSNull(),
+    ]
+    for value in values {
+      let stub = Stub([
+        .json(429, ["error": "daykeeper_usage_limit_exceeded", "nextAction": value])
+      ])
+      do {
+        _ = try await stub.client().getUnread()
+        XCTFail("Expected a rejection")
+      } catch {
+        let safe = try XCTUnwrap(error as? DaykeeperError)
+        XCTAssertNil(safe.nextAction)
+        let encoded = try XCTUnwrap(String(data: JSONEncoder().encode(safe), encoding: .utf8))
+        XCTAssertFalse(encoded.contains("nextAction"))
+        XCTAssertFalse(encoded.contains("review_billing"))
+      }
+    }
+    let absent = Stub([.json(404, ["error": "not_found"])])
+    do {
+      _ = try await absent.client().getUnread()
+      XCTFail("Expected a rejection")
+    } catch {
+      let safe = try XCTUnwrap(error as? DaykeeperError)
+      XCTAssertNil(safe.nextAction)
+      let encoded = try XCTUnwrap(String(data: JSONEncoder().encode(safe), encoding: .utf8))
+      XCTAssertFalse(encoded.contains("nextAction"))
+    }
+  }
 }
