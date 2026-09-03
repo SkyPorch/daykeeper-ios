@@ -3,6 +3,13 @@ import XCTest
 final class MessengerTests: XCTestCase {
   private var app: XCUIApplication!
   private var key = ""
+  /// Generous on purpose: waitForExistence returns as soon as the element is
+  /// there, so a high ceiling costs nothing when the app behaves and only buys
+  /// slack when a shared CI runner stalls.
+  private let wait: TimeInterval = 30
+  /// Must stay below `wait`, so a slow-but-successful write still lands inside
+  /// the window the assertions are watching.
+  private let clientTimeout = 15
   override func setUpWithError() throws { continueAfterFailure = false }
 
   @MainActor private func launch(_ mode: String, dark: Bool = false, large: Bool = false) throws {
@@ -17,18 +24,19 @@ final class MessengerTests: XCTestCase {
       "DAYKEEPER_EXAMPLE_DARK": dark ? "1" : "0",
       "DAYKEEPER_EXAMPLE_LARGE_TEXT": large ? "1" : "0",
       "DAYKEEPER_EXAMPLE_MANUAL_START": "1",
+      "DAYKEEPER_EXAMPLE_TIMEOUT": "\(clientTimeout)",
     ]
     app.launch()
     let start = app.buttons["example.start-fixture"]
-    XCTAssertTrue(start.waitForExistence(timeout: 15))
+    XCTAssertTrue(start.waitForExistence(timeout: wait))
     start.tap()
     let readyID = mode.hasPrefix("new") ? "daykeeper.new-conversation" : "daykeeper.conversation.7"
-    XCTAssertTrue(app.buttons[readyID].waitForExistence(timeout: 15))
+    XCTAssertTrue(app.buttons[readyID].waitForExistence(timeout: wait))
   }
 
   @MainActor private func openConversation() {
     app.buttons["daykeeper.conversation.7"].tap()
-    XCTAssertTrue(app.textViews["daykeeper.message"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.textViews["daykeeper.message"].waitForExistence(timeout: wait))
   }
 
   @MainActor private func snapshot(_ name: String) {
@@ -48,9 +56,9 @@ final class MessengerTests: XCTestCase {
 
   @MainActor private func confirmAlert(_ title: String, action: String) {
     let alert = app.alerts[title]
-    XCTAssertTrue(alert.waitForExistence(timeout: 10))
+    XCTAssertTrue(alert.waitForExistence(timeout: wait))
     let button = alert.buttons[action]
-    XCTAssertTrue(button.waitForExistence(timeout: 5))
+    XCTAssertTrue(button.waitForExistence(timeout: wait))
     button.tap()
   }
 
@@ -72,23 +80,23 @@ final class MessengerTests: XCTestCase {
     XCTAssertTrue(app.staticTexts["Hello from support for customer a"].exists)
     app.buttons["daykeeper.mark-read"].tap()
     app.buttons["daykeeper.conversations"].tap()
-    XCTAssertTrue(app.buttons["daykeeper.conversation.7"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.buttons["daykeeper.conversation.7"].waitForExistence(timeout: wait))
     XCTAssertFalse(app.staticTexts["1 unread"].exists)
     XCTAssertTrue(app.staticTexts["open"].exists)
     snapshot("after-seen-light")
     openConversation()
     enterMessage("Can you help with my account?")
     app.buttons["daykeeper.send"].tap()
-    XCTAssertTrue(app.staticTexts["Can you help with my account?"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["Can you help with my account?"].waitForExistence(timeout: wait))
     app.buttons["daykeeper.refresh"].tap()
-    XCTAssertTrue(app.staticTexts["Can you help with my account?"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["Can you help with my account?"].waitForExistence(timeout: wait))
     snapshot("conversation-light")
     let receipt = try await counters()
     XCTAssertEqual(receipt["sends"], 1)
     XCTAssertEqual(receipt["seen"], 1)
     app.buttons["example.sign-out"].tap()
     XCTAssertTrue(
-      app.staticTexts["Sign in to your app to use support."].waitForExistence(timeout: 5))
+      app.staticTexts["Sign in to your app to use support."].waitForExistence(timeout: wait))
     XCTAssertFalse(app.staticTexts["Can you help with my account?"].exists)
   }
 
@@ -99,7 +107,7 @@ final class MessengerTests: XCTestCase {
     let input = app.textViews["daykeeper.message"]
     enterMessage("Keep this draft")
     app.buttons["daykeeper.send"].tap()
-    XCTAssertTrue(app.staticTexts["daykeeper.error"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["daykeeper.error"].waitForExistence(timeout: wait))
     XCTAssertTrue(app.staticTexts["daykeeper.error"].label.contains("current allowance"))
     XCTAssertEqual(input.value as? String, "Keep this draft")
     XCTAssertTrue(app.staticTexts["Hello from support for customer a"].exists)
@@ -115,12 +123,12 @@ final class MessengerTests: XCTestCase {
     let input = app.textViews["daykeeper.message"]
     enterMessage("Confirm this once")
     app.buttons["daykeeper.send"].tap()
-    XCTAssertTrue(app.buttons["Discard draft after review"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.buttons["Discard draft after review"].waitForExistence(timeout: wait))
     XCTAssertFalse(app.buttons["daykeeper.send"].isEnabled)
     XCTAssertFalse(app.buttons["Discard draft after review"].isEnabled)
     snapshot("uncertain-message-before-refresh")
     app.buttons["daykeeper.refresh"].tap()
-    XCTAssertTrue(app.staticTexts["Confirm this once"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["Confirm this once"].waitForExistence(timeout: wait))
     XCTAssertTrue(app.buttons["Discard draft after review"].isEnabled)
     snapshot("uncertain-message-after-refresh")
     app.buttons["Discard draft after review"].tap()
@@ -140,11 +148,11 @@ final class MessengerTests: XCTestCase {
     // This test runner is bound to its newly created simulator, never a user's device.
     XCUIDevice.shared.press(.home)
     app.activate()
-    XCTAssertTrue(input.waitForExistence(timeout: 10))
+    XCTAssertTrue(input.waitForExistence(timeout: wait))
     XCTAssertEqual(input.value as? String, "Private draft for a")
     snapshot("large-text-dark")
     app.buttons["example.switch"].tap()
-    XCTAssertTrue(app.buttons["daykeeper.conversation.7"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.buttons["daykeeper.conversation.7"].waitForExistence(timeout: wait))
     openConversation()
     XCTAssertTrue(app.staticTexts["Hello from support for customer b"].exists)
     XCTAssertFalse(app.staticTexts["Hello from support for customer a"].exists)
@@ -154,14 +162,14 @@ final class MessengerTests: XCTestCase {
   @MainActor func testCreateFirstConversationAndSend() async throws {
     try launch("newui")
     defer { app.terminate() }
-    XCTAssertTrue(app.staticTexts["No conversations yet."].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["No conversations yet."].waitForExistence(timeout: wait))
     app.buttons["daykeeper.new-conversation"].tap()
-    XCTAssertTrue(app.textViews["daykeeper.message"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.textViews["daykeeper.message"].waitForExistence(timeout: wait))
     enterMessage("My first support message")
     app.buttons["daykeeper.send"].tap()
-    XCTAssertTrue(app.staticTexts["My first support message"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["My first support message"].waitForExistence(timeout: wait))
     app.buttons["daykeeper.refresh"].tap()
-    XCTAssertTrue(app.staticTexts["My first support message"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["My first support message"].waitForExistence(timeout: wait))
     let receipt = try await counters()
     XCTAssertEqual(receipt["creates"], 1)
     XCTAssertEqual(receipt["sends"], 1)
@@ -170,14 +178,14 @@ final class MessengerTests: XCTestCase {
   @MainActor func testUncertainCreationCanBeReviewedWithoutRepeatingIt() async throws {
     try launch("newcreation500")
     defer { app.terminate() }
-    XCTAssertTrue(app.staticTexts["No conversations yet."].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["No conversations yet."].waitForExistence(timeout: wait))
     app.buttons["daykeeper.new-conversation"].tap()
-    XCTAssertTrue(app.buttons["Finish reviewing conversations"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.buttons["Finish reviewing conversations"].waitForExistence(timeout: wait))
     XCTAssertFalse(app.buttons["daykeeper.new-conversation"].isEnabled)
     XCTAssertFalse(app.buttons["Finish reviewing conversations"].isEnabled)
     snapshot("uncertain-creation-before-refresh")
     app.buttons["daykeeper.refresh"].tap()
-    XCTAssertTrue(app.buttons["daykeeper.conversation.7"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.buttons["daykeeper.conversation.7"].waitForExistence(timeout: wait))
     XCTAssertTrue(app.buttons["Finish reviewing conversations"].isEnabled)
     snapshot("uncertain-creation-after-refresh")
     app.buttons["Finish reviewing conversations"].tap()
