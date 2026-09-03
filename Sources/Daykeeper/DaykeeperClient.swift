@@ -44,6 +44,14 @@ public final class DaykeeperClient: @unchecked Sendable {
   public func getIdentity() async throws -> DaykeeperCustomerIdentity {
     try await request("/v1/identity")
   }
+  /// Identity read that always asks the token provider for a fresh credential
+  /// before the request, whatever the previous response advised. It exists so a
+  /// caller can tell an expired token apart from a revoked customer without
+  /// depending on the ordinary 401 retry, which a `retryable: false` hint
+  /// suppresses. It is a read: nothing is ever replayed.
+  public func getIdentityWithFreshToken() async throws -> DaykeeperCustomerIdentity {
+    try await request("/v1/identity", forceRefresh: true)
+  }
   public func listConversations() async throws -> DaykeeperConversationList {
     try await request("/v1/conversations") {
       try Self.validate($0.conversations)
@@ -112,17 +120,20 @@ public final class DaykeeperClient: @unchecked Sendable {
   }
 
   private func request<Value: Decodable & Sendable>(
-    _ path: String, write: Bool = false, body: Data? = nil,
+    _ path: String, write: Bool = false, body: Data? = nil, forceRefresh: Bool = false,
     validate: @escaping @Sendable (Value) throws -> Void = { _ in }
   ) async throws -> Value {
     let dispatch = RequestDispatch()
     do {
       return try await RequestLifetime<Value>.run(seconds: timeout) { [self] in
-        for attempt in 0..<(write ? 1 : 2) {
+        // A forced-refresh read already carries a new credential, so it gets one
+        // attempt like a write rather than a refresh-and-retry pair.
+        for attempt in 0..<((write || forceRefresh) ? 1 : 2) {
           try Task.checkCancellation()
           let token: String
           do {
-            token = try await tokenProvider(DaykeeperTokenRequest(forceRefresh: attempt == 1))
+            token = try await tokenProvider(
+              DaykeeperTokenRequest(forceRefresh: forceRefresh || attempt == 1))
           } catch {
             try Task.checkCancellation()
             throw DaykeeperError("TOKEN_PROVIDER_ERROR")
