@@ -145,7 +145,21 @@ including credential acquisition and response reading. An uncooperative token
 provider can continue its own work after cancellation, but a late result cannot
 dispatch the canceled SDK request. Decoded response bodies are capped at 1 MiB.
 Redirects, ambient cookies/credentials, and HTTP caching are disabled. HTTPS is
-required except for exact loopback hosts used in local development.
+always required in a release build.
+
+Plain `http://` to an exact loopback host (`localhost`, `127.0.0.1`, `::1`) is
+accepted only when this SDK itself is compiled with `DEBUG` defined — that is
+the SDK target's own build configuration, not your app's. A SwiftPM or
+CocoaPods consumer building the package in Debug gets the local-fixture
+convenience; a Release build of the SDK refuses every unencrypted base URL, so
+it cannot be reached in a shipped app.
+
+Message history is read forward with the contract's `after` cursor. Refreshing
+an open thread asks only for messages newer than the last one held, so a long
+conversation is not re-read in full each time. The customer contract has no
+backward cursor or page-size parameter, so the client cannot request an older
+window; a thread whose first page already exceeds the 1 MiB response cap needs a
+gateway-side page parameter before it can be opened.
 
 ## Privacy and licensing
 
