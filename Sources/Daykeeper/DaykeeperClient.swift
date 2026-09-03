@@ -165,13 +165,14 @@ public final class DaykeeperClient: @unchecked Sendable {
           if !write, attempt == 0, response.status == 401, hint?.retryable != false { continue }
           guard (200..<300).contains(response.status) else {
             let code =
-              hint?.error.flatMap { DaykeeperError.safeAPICodes.contains($0) ? $0 : nil }
+              hint?.error.flatMap { DaykeeperError.isSafeCode($0) ? $0 : nil }
               ?? "daykeeper_request_failed"
             throw DaykeeperError(
               code, status: response.status,
               retryable: !write
                 && (hint?.retryable
-                  ?? (response.status == 408 || response.status == 429 || response.status >= 500))
+                  ?? (response.status == 408 || response.status == 429 || response.status >= 500)),
+              nextAction: hint?.nextAction.flatMap(DaykeeperNextAction.init(rawValue:))
             )
           }
           let result: Value
@@ -196,14 +197,22 @@ public final class DaykeeperClient: @unchecked Sendable {
     }
   }
 
+  /// The parts of the error envelope the SDK is willing to look at. `message` is
+  /// deliberately absent: it is free-form prose meant for a human reading the
+  /// gateway's own surfaces, and it must never become a client-visible error.
+  /// Each field is decoded as its exact JSON type, so a number, boolean, array
+  /// or object in `error` or `nextAction` decodes to nil rather than being
+  /// coerced into something code-shaped.
   private struct APIHint: Decodable {
     let error: String?
     let retryable: Bool?
-    enum CodingKeys: CodingKey { case error, retryable }
+    let nextAction: String?
+    enum CodingKeys: CodingKey { case error, retryable, nextAction }
     init(from decoder: Decoder) throws {
       let values = try decoder.container(keyedBy: CodingKeys.self)
       error = try? values.decode(String.self, forKey: .error)
       retryable = try? values.decode(Bool.self, forKey: .retryable)
+      nextAction = try? values.decode(String.self, forKey: .nextAction)
     }
   }
   /// Plain HTTP is a debug-only convenience for a developer's own loopback
