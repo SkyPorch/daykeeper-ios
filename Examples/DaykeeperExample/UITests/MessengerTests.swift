@@ -81,8 +81,11 @@ final class MessengerTests: XCTestCase {
     app.buttons["daykeeper.mark-read"].tap()
     app.buttons["daykeeper.conversations"].tap()
     XCTAssertTrue(app.buttons["daykeeper.conversation.7"].waitForExistence(timeout: wait))
-    XCTAssertFalse(app.staticTexts["1 unread"].exists)
-    XCTAssertTrue(app.staticTexts["open"].exists)
+    // Both labels are localized. "1 unread" and "open" were the pre-localization
+    // strings; the negative assertion in particular passed vacuously once the
+    // rendered text changed, so it had stopped checking anything.
+    XCTAssertFalse(app.staticTexts["1 unread message"].exists)
+    XCTAssertTrue(app.staticTexts["Open"].exists)
     snapshot("after-seen-light")
     openConversation()
     enterMessage("Can you help with my account?")
