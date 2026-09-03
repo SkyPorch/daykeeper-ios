@@ -20,7 +20,7 @@ Pod::Spec.new do |spec|
   spec.module_name = "DaykeeperUI"
   spec.source_files = "Sources/DaykeeperUI/**/*.swift"
   spec.resource_bundles = {
-    "DaykeeperUI" => ["Sources/DaykeeperUI/Resources/**/*.lproj/*.strings"],
+    "DaykeeperUI" => ["Sources/DaykeeperUI/Resources/**/*.lproj/*"],
   }
   spec.dependency "Daykeeper", spec.version.to_s
 end

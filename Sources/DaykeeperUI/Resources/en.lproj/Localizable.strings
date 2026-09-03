@@ -20,19 +20,20 @@
 "daykeeper.no_conversations" = "No conversations yet.";
 /* Fallback conversation title when the gateway sent no preview. %lld is the conversation number. */
 "daykeeper.conversation_fallback" = "Conversation %lld";
-/* Unread badge text. %lld is the number of unread messages. */
-"daykeeper.unread_count" = "%lld unread";
 /* Button that starts a new support conversation. */
 "daykeeper.new_conversation" = "New conversation";
-/* Button that asks the gateway for more of the conversation's history. */
-"daykeeper.load_earlier" = "Load earlier messages";
+
+/* Conversation status labels. The gateway may send a status this release has
+   never seen; that value is shown verbatim instead of one of these. */
+"daykeeper.status.open" = "Open";
+"daykeeper.status.pending" = "Pending";
+"daykeeper.status.resolved" = "Resolved";
+"daykeeper.status.snoozed" = "Snoozed";
 
 /* Author label for a message the customer sent. */
 "daykeeper.sender.you" = "You";
 /* Author label for a message from the support team when no agent name was sent. */
 "daykeeper.sender.support" = "Support";
-/* Note under a message with files the SDK cannot display. %lld is the file count. */
-"daykeeper.attachments" = "This message includes %lld attachment(s). Attachment viewing is not available in this SDK candidate.";
 
 /* Composer accessibility label. */
 "daykeeper.composer" = "Message";
@@ -73,6 +74,8 @@
 "daykeeper.error.usage_limit" = "Support has reached its current allowance. Contact the workspace owner. Existing history remains available.";
 /* Error shown when the workspace has not finished setting support up. */
 "daykeeper.error.not_ready" = "This support inbox is not ready yet. Contact the workspace owner.";
+/* Error shown when the support session expired before a request was accepted. */
+"daykeeper.error.expired_token" = "Your support session expired before that was sent. Nothing was sent. Try again.";
 /* Error shown when the gateway could not be reached. */
 "daykeeper.error.unreachable" = "Support could not be reached. Check your connection and refresh.";
 /* Error shown when the request was canceled. */

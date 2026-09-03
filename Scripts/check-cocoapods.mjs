@@ -57,7 +57,11 @@ const ui = readSpec("DaykeeperUI.podspec");
 assertCommon(ui, "DaykeeperUI");
 assert.equal(ui.source_files, "Sources/DaykeeperUI/**/*.swift");
 assert.deepEqual(ui.dependencies, { Daykeeper: ["0.1.0"] });
-assert.equal(ui.resource_bundles, undefined);
+// The messenger ships its own localized strings; a consumer that does not get
+// this bundle compiles but shows nothing.
+assert.deepEqual(ui.resource_bundles, {
+  DaykeeperUI: ["Sources/DaykeeperUI/Resources/**/*.lproj/*"],
+});
 
 run(pod[0], [
   ...pod.slice(1),
