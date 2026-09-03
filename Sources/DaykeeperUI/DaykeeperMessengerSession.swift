@@ -3,7 +3,7 @@ import Daykeeper
 import Foundation
 
 internal protocol CustomerAPI: Sendable {
-  func getIdentity() async throws -> DaykeeperCustomerIdentity
+  func getIdentityWithFreshToken() async throws -> DaykeeperCustomerIdentity
   func listConversations() async throws -> DaykeeperConversationList
   func createConversation() async throws -> DaykeeperConversationResult
   func listMessages(in conversationID: Int64, after: Int64?) async throws -> DaykeeperMessageList
@@ -24,8 +24,6 @@ extension DaykeeperClient: CustomerAPI {}
   @Published public private(set) var error: DaykeeperError?
   @Published public private(set) var uncertainCreation = false
   @Published public private(set) var uncertainThreads: Set<Int64> = []
-  /// True once a thread is open and the gateway has served at least one page.
-  @Published public private(set) var canLoadEarlierMessages = false
   @Published public var draft = ""
   @Published private var reviewedUncertainThreads: Set<Int64> = []
   @Published private var creationReviewed = false
@@ -41,6 +39,13 @@ extension DaykeeperClient: CustomerAPI {}
     case marker
   }
   private var pendingWrite: WriteConcern?
+  /// Subject and identifier the customer token resolved to the first time this
+  /// session read identity. A later read that resolves to anyone else means the
+  /// host swapped customers underneath us and nothing loaded here may be shown.
+  private var identityBaseline: (subject: String, identifier: String)?
+  /// One read-marker recovery per session revision: a thread whose seen marker
+  /// keeps being rejected must not ask the host for a token on every tap.
+  private var markerRecoveryRevision: Int?
 
   public convenience init(client: DaykeeperClient) { self.init(customerAPI: client) }
   internal init(customerAPI: any CustomerAPI) { client = customerAPI }
@@ -154,26 +159,6 @@ extension DaykeeperClient: CustomerAPI {}
     if confirmed { await refresh() }
   }
 
-  /// Ask the gateway for the conversation's default window again and fold any
-  /// message we do not already hold into the thread, oldest first. The customer
-  /// contract exposes only a forward `after` cursor, so this is the widest
-  /// backward request the client is allowed to make. It never drops what is
-  /// already loaded and never replays a write.
-  public func loadEarlierMessages() async {
-    guard canLoadEarlierMessages, !isBusy, !isSuspended, !isSignedOut,
-      let id = selectedConversationID
-    else { return }
-    await perform {
-      try await $0.listMessages(in: id, after: nil)
-    } success: { result in
-      self.mergeMessages(result.messages)
-    }
-  }
-
-  /// Newest message the client holds for the open thread. Refresh uses it as the
-  /// `after` cursor so an already-loaded thread is never re-read in full.
-  public var latestLoadedMessageID: Int64? { messages.last?.id }
-
   /// Explicitly discard a preserved draft only after the human reviews history.
   /// This does not cancel or reverse any previously accepted server write.
   public func discardUncertainDraft() {
@@ -234,6 +219,8 @@ extension DaykeeperClient: CustomerAPI {}
     uncertainThreads = []
     reviewedUncertainThreads = []
     creationReviewed = false
+    identityBaseline = nil
+    markerRecoveryRevision = nil
     isSuspended = false
     isSignedOut = true
   }
@@ -242,7 +229,6 @@ extension DaykeeperClient: CustomerAPI {}
 
   private func replaceMessages(_ values: [DaykeeperMessage]) {
     messages = values.sorted { $0.id < $1.id }
-    canLoadEarlierMessages = selectedConversationID != nil && !values.isEmpty
   }
 
   /// Pages arrive newest-side first and may overlap after a resend or a seen
@@ -252,7 +238,6 @@ extension DaykeeperClient: CustomerAPI {}
     var byID = Dictionary(messages.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
     for value in values { byID[value.id] = value }
     messages = byID.values.sorted { $0.id < $1.id }
-    canLoadEarlierMessages = selectedConversationID != nil && !messages.isEmpty
   }
   private func invalidate() {
     recordUncertainty(pendingWrite)
@@ -263,17 +248,45 @@ extension DaykeeperClient: CustomerAPI {}
     isBusy = false
   }
 
-  /// Exactly one recovery attempt. `getIdentity` is a read, so the client asks
-  /// the host's token provider for a forced refresh on its own 401 and does not
-  /// replay anything. A second failure means the customer really is signed out.
-  private func confirmSessionAfterWriteRejection() async -> Bool {
-    guard let client else { return false }
+  /// Exactly one recovery attempt, and it always asks the host for a fresh
+  /// token rather than relying on the ordinary 401 retry, which the gateway can
+  /// suppress with a `retryable: false` hint. It is a read; nothing is replayed.
+  /// The task is registered the same way `perform` registers its own, so
+  /// suspend() and reset() cancel it and a stale answer can never be applied.
+  ///
+  /// A successful read must also resolve to the same customer. The first read
+  /// records the baseline; any later read that names a different subject or
+  /// identifier means the host swapped identities and the session is dropped.
+  private func confirmSessionAfterWriteRejection(ticket: Int) async -> Recovery {
+    guard let client else { return .signedOut }
+    let task = Task { try await client.getIdentityWithFreshToken() }
+    cancelCurrent = { task.cancel() }
+    let identity: DaykeeperCustomerIdentity
     do {
-      _ = try await client.getIdentity()
-      return true
+      identity = try await task.value
     } catch {
-      return false
+      // Only a rejected credential proves the customer is gone. A timeout, a
+      // dropped connection or a 5xx says nothing about it, so the session and
+      // everything the customer typed stay exactly as they are.
+      let status = (error as? DaykeeperError)?.status
+      return status == 401 || status == 403 ? .signedOut : .unavailable
     }
+    guard ticket == revision else { return .unavailable }
+    guard let baseline = identityBaseline else {
+      identityBaseline = (identity.subject, identity.identifier)
+      return .signedIn
+    }
+    return baseline.subject == identity.subject && baseline.identifier == identity.identifier
+      ? .signedIn : .signedOut
+  }
+
+  private enum Recovery {
+    /// A fresh credential works and names the same customer.
+    case signedIn
+    /// The gateway rejected the fresh credential, or it named someone else.
+    case signedOut
+    /// The recovery read failed for a reason unrelated to the credential.
+    case unavailable
   }
 
   private func recordUncertainty(_ write: WriteConcern?) {
@@ -315,18 +328,31 @@ extension DaykeeperClient: CustomerAPI {}
           reset()
           return
         }
-        // A write may have been accepted before the token expired. Do not throw
-        // the draft and the history away on the first rejection: ask for one
-        // fresh token and prove the customer is still signed in with a read.
-        let stillSignedIn = await confirmSessionAfterWriteRejection()
-        guard ticket == revision else { return }
-        guard stillSignedIn else {
-          reset()
-          return
+        var alreadyConfirmed = false
+        if case .marker = write, markerRecoveryRevision == ticket { alreadyConfirmed = true }
+        if !alreadyConfirmed {
+          // A write may have been accepted before the token expired. Do not throw
+          // the draft and the history away on the first rejection: ask for one
+          // fresh token and prove the same customer is still signed in.
+          if case .marker = write { markerRecoveryRevision = ticket }
+          switch await confirmSessionAfterWriteRejection(ticket: ticket) {
+          case .signedOut:
+            reset()
+            return
+          case .unavailable:
+            // Fall through to the ordinary error path: nothing was learned about
+            // the credential, so nothing the customer can see is thrown away.
+            break
+          case .signedIn:
+            break
+          }
+          guard ticket == revision else { return }
         }
-        // Never resend the write. Surface it for review instead.
+        // Never resend the write. A 4xx rejection is a definite refusal: the
+        // gateway did not accept it, so the draft stays editable and only the
+        // message changes. Uncertainty is reserved for outcomes we cannot know.
         self.error = safe
-        recordUncertainty(write)
+        if safe?.outcomeUnknown ?? true { recordUncertainty(write) }
         if ticket == revision {
           isBusy = false
           cancelCurrent = nil
