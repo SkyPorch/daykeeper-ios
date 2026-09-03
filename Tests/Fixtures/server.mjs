@@ -45,7 +45,14 @@ const server = createServer(async (request, response) => {
   if (key.startsWith("read401") && receipt.hits === 1) return json(401,{error:"expired_token"});
   if (key.startsWith("deny401")) return json(401,{error:{private:"not-safe"},retryable:false});
   if (key.startsWith("write401")) return json(401,{error:"expired_token",retryable:true});
+  // Expired credential whose hint forbids the ordinary refresh-and-retry. Only a
+  // caller that asks the provider for a fresh token unconditionally gets through.
+  if (key.startsWith("freshonly") && request.headers.authorization !== "Bearer fixture-refreshed")
+    return json(401,{error:"expired_token",retryable:false});
   if (key.startsWith("write500")) return json(500,{error:"support_upstream_unavailable",retryable:true});
+  if (path === "/v1/identity") return json(200,{baseUrl:origin,websiteToken:"synthetic",
+    subject:`customer-${customer}`,identifier:`customer-${customer}`,identifierHash:"synthetic",
+    email:null,name:"Synthetic"});
   if (path === "/v1/conversations") {
     if(request.method === "POST") {
       receipt.creates++; createdCases.add(key);

@@ -46,6 +46,25 @@ final class WireTests: XCTestCase {
     let (data, _) = try await session.data(from: components.url!)
     return try JSONDecoder().decode(Receipt.self, from: data)
   }
+  func testForcedRefreshIdentityReadIgnoresANonRetryableExpiredTokenHint() async throws {
+    let (url, _) = try caseURL("freshonly")
+    let client = try DaykeeperClient(baseURL: url) { request in
+      request.forceRefresh ? "fixture-refreshed" : "fixture-a"
+    }
+    // The ordinary read obeys the gateway and does not refresh: the hint said no.
+    do {
+      _ = try await client.getIdentity()
+      XCTFail("Expected the suppressed retry to surface the rejection")
+    } catch {
+      XCTAssertEqual((error as? DaykeeperError)?.status, 401)
+    }
+    // The recovery read asks for a fresh credential whatever the hint said, which
+    // is what lets the messenger tell an expired token from a revoked customer.
+    let identity = try await client.getIdentityWithFreshToken()
+    XCTAssertEqual(identity.subject, "customer-a")
+    XCTAssertEqual(identity.identifier, "customer-a")
+  }
+
   func testMessageCursorReachesTheGatewayAndReturnsOnlyNewerMessages() async throws {
     let (url, _) = try caseURL("cursor")
     let client = try DaykeeperClient(baseURL: url) { _ in "fixture-a" }
