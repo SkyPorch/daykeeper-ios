@@ -31,8 +31,14 @@ export async function withFixture(action) {
   const reader = createInterface({ input: server.stdout });
   let timer;
   try {
+    const started = Date.now();
     const ready = await new Promise((resolve, reject) => {
-      timer = setTimeout(() => reject(new Error("Fixture startup timed out")), 60_000);
+      // Ordering (see check-ios.mjs) should keep this well under a second. The
+      // ceiling only has to survive a runner that is briefly starved, and it
+      // costs nothing on success because readiness clears the timer.
+      timer = setTimeout(() => reject(new Error(
+        `Fixture did not report readiness within ${Math.round((Date.now() - started) / 1000)}s; `
+        + "the host was most likely starved of CPU by another task")), 120_000);
       reader.once("line", line => {
         try { resolve(JSON.parse(line)); } catch (error) { reject(error); }
       });

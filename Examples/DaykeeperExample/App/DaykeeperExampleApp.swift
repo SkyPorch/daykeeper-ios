@@ -64,8 +64,17 @@ import SwiftUI
         url.password == nil, url.query == nil, url.fragment == nil
       else { return }
       let token = "fixture-\(customer)"
+      // 3s keeps the demo snappy, but a loaded CI runner can stall a tap-to-idle
+      // cycle for longer than that, and the SDK then correctly reports the write
+      // as uncertain — a real behaviour, wrong answer for a happy-path UI test.
+      // The UI tests raise this; uncertain writes stay covered by the fixture
+      // cases that force them with an explicit 500.
+      let timeout =
+        TimeInterval(ProcessInfo.processInfo.environment["DAYKEEPER_EXAMPLE_TIMEOUT"] ?? "")
+        ?? 3
       guard
-        let client = try? DaykeeperClient(baseURL: url, timeout: 3, tokenProvider: { _ in token })
+        let client = try? DaykeeperClient(
+          baseURL: url, timeout: timeout, tokenProvider: { _ in token })
       else { return }
       session = DaykeeperMessengerSession(client: client)
     #endif
