@@ -1,0 +1,86 @@
+/* Daykeeper messenger user-facing text. English is the base language.
+   Keys are stable; translations may be added as further .lproj directories. */
+
+/* Shown instead of the messenger when the host app has no signed-in customer. */
+"daykeeper.signed_out" = "Sign in to your app to use support.";
+/* Shown while the app is backgrounded and the session is paused. */
+"daykeeper.suspended" = "Support is paused while the app is inactive.";
+/* Navigation title of the messenger. */
+"daykeeper.title" = "Support";
+/* Keyboard toolbar button that dismisses the composer keyboard. */
+"daykeeper.done_editing" = "Done";
+/* Toolbar button that returns from a thread to the conversation list. */
+"daykeeper.conversations" = "Conversations";
+/* Toolbar button that reloads conversations and new messages. */
+"daykeeper.refresh" = "Refresh";
+/* Progress label while a request is in flight. */
+"daykeeper.progress" = "Updating support…";
+
+/* Empty state for the conversation list. */
+"daykeeper.no_conversations" = "No conversations yet.";
+/* Fallback conversation title when the gateway sent no preview. %lld is the conversation number. */
+"daykeeper.conversation_fallback" = "Conversation %lld";
+/* Button that starts a new support conversation. */
+"daykeeper.new_conversation" = "New conversation";
+
+/* Conversation status labels. The gateway may send a status this release has
+   never seen; that value is shown verbatim instead of one of these. */
+"daykeeper.status.open" = "Open";
+"daykeeper.status.pending" = "Pending";
+"daykeeper.status.resolved" = "Resolved";
+"daykeeper.status.snoozed" = "Snoozed";
+
+/* Author label for a message the customer sent. */
+"daykeeper.sender.you" = "You";
+/* Author label for a message from the support team when no agent name was sent. */
+"daykeeper.sender.support" = "Support";
+
+/* Composer accessibility label. */
+"daykeeper.composer" = "Message";
+/* Button that sends the composed message. */
+"daykeeper.send" = "Send";
+/* Button that marks the open conversation as read. */
+"daykeeper.mark_read" = "Mark conversation read";
+
+/* Banner shown when a send could not be confirmed. */
+"daykeeper.uncertain_thread.body" = "Your message may have been sent. The draft is preserved. Refresh and review history; it will not be sent again automatically.";
+/* Button that opens the discard confirmation for a preserved draft. */
+"daykeeper.uncertain_thread.button" = "Discard draft after review";
+/* Title of the discard confirmation. */
+"daykeeper.discard.title" = "Discard this draft?";
+/* Cancel button of the discard confirmation. */
+"daykeeper.discard.keep" = "Keep draft";
+/* Destructive button of the discard confirmation. */
+"daykeeper.discard.confirm" = "Discard draft";
+/* Body of the discard confirmation. */
+"daykeeper.discard.message" = "The earlier message may already have been sent. Review the conversation first. Discarding this draft cannot undo a sent message.";
+
+/* Banner shown when creating a conversation could not be confirmed. */
+"daykeeper.uncertain_creation.body" = "We could not confirm the new conversation. Refresh and inspect existing conversations before starting another. No request was automatically repeated.";
+/* Button that opens the review confirmation for an unconfirmed conversation. */
+"daykeeper.uncertain_creation.button" = "Finish reviewing conversations";
+/* Title of the review confirmation. */
+"daykeeper.creation.title" = "Finished reviewing conversations?";
+/* Cancel button of the review confirmation. */
+"daykeeper.creation.keep" = "Keep reviewing";
+/* Acknowledgement button of the review confirmation. */
+"daykeeper.creation.confirm" = "I have reviewed the list";
+/* Body of the review confirmation. */
+"daykeeper.creation.message" = "The earlier conversation may already exist. This only enables starting a new conversation; it does not repeat or undo the earlier request.";
+
+/* Error shown when a write's outcome could not be confirmed. */
+"daykeeper.error.outcome_unknown" = "The result could not be confirmed. Review history before trying another write.";
+/* Error shown when the workspace has used its support allowance. */
+"daykeeper.error.usage_limit" = "Support has reached its current allowance. Contact the workspace owner. Existing history remains available.";
+/* Error shown when the workspace has not finished setting support up. */
+"daykeeper.error.not_ready" = "This support inbox is not ready yet. Contact the workspace owner.";
+/* Error shown when the support session expired before a request was accepted. */
+"daykeeper.error.expired_token" = "Your support session expired before that was sent. Nothing was sent. Try again.";
+/* Error shown when the gateway could not be reached. */
+"daykeeper.error.unreachable" = "Support could not be reached. Check your connection and refresh.";
+/* Error shown when the request was canceled. */
+"daykeeper.error.canceled" = "The request was canceled.";
+/* Error shown when the host app could not supply a support token. */
+"daykeeper.error.token_provider" = "Your app could not confirm your support session. Sign in again.";
+/* Error shown for any other failure. */
+"daykeeper.error.default" = "Support could not complete that request. Refresh your session before trying again.";

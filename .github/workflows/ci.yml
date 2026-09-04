@@ -1,0 +1,107 @@
+name: CI
+on:
+  pull_request:
+    # Documentation-only changes cannot break a Swift build, and every run of
+    # this workflow spends macOS-runner minutes that bill at roughly ten times
+    # the Linux rate. Keep this list narrow: anything a check script reads
+    # (openapi/LICENSE, the root LICENSE that the podspec points at) must not
+    # be ignored. Note for when this repository goes public and main gains
+    # branch protection: a required status check combined with paths-ignore
+    # leaves docs-only pull requests permanently pending, so either keep CI
+    # non-required or add an always-run gate job at that point.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  # Runs before anything touches a macOS runner. A failure here costs Linux
+  # minutes instead of the ~15 macOS minutes a full ios-package run bills.
+  portable-checks:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    # Matches the Apple Swift 6.3.3 toolchain that Xcode 26.6 ships on the
+    # macos-26 runner, so swift-format agrees across both platforms.
+    container: swift:6.3.3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22.22.0
+      - run: node Scripts/check-contract.mjs
+      - run: swift format lint --strict --recursive Package.swift Sources Tests Examples
+
+  secret-history:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install checksum-pinned Gitleaks
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          archive="${RUNNER_TEMP}/gitleaks.tar.gz"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            --output "${archive}"
+          printf '%s  %s\n' "${GITLEAKS_SHA256}" "${archive}" | sha256sum --check --strict
+          tar --extract --gzip --file "${archive}" --directory "${RUNNER_TEMP}" gitleaks
+      - name: Scan complete candidate history
+        run: |
+          "${RUNNER_TEMP}/gitleaks" git . --no-banner --redact
+
+  ios-package:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    needs: portable-checks
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22.22.0
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+          pod --version
+      - name: Install minimum supported CocoaPods
+        run: |
+          gem install cocoapods --version 1.16.2 --no-document
+          pod _1.16.2_ --version
+      # check-contract.mjs and swift-format now run in portable-checks. The wire
+      # tests deliberately stay here: they exercise URLSession, which differs
+      # between Darwin and swift-corelibs-foundation, and this is an iOS SDK.
+      - run: swift test --skip WireTests -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors
+      - run: node Scripts/check-wire.mjs
+      - name: CocoaPods metadata and source consumers
+        run: node Scripts/check-cocoapods.mjs
+      - name: Generic simulator compile (not runtime certification)
+        run: xcodebuild -scheme DaykeeperUI -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData/Generic CODE_SIGNING_ALLOWED=NO build
+      - name: Native SwiftPM consumer and UI checks
+        run: node Scripts/check-ios.mjs
+      - name: Native test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-ios-test-results
+          path: TestResults/
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,20 +1,25 @@
 # Security
 
-Do not open public issues for vulnerabilities or include credentials, customer
-data, or tenant identifiers in reports. Contact SkyPorch privately with the
-affected version, reproduction steps, and impact. Supported versions will be
-listed here before the first public release.
+Do not put credentials, customer messages, tokens, or private gateway URLs in
+public issues, logs, screenshots, or crash reports. SDK error values are sanitized;
+successful response models are not safe telemetry payloads.
 
-## How to report
+Use GitHub private vulnerability reporting when enabled. Otherwise contact a
+repository maintainer privately through your existing SkyPorch support channel.
+Do not open a public exploit report containing customer data.
 
-Use GitHub's private vulnerability reporting on this repository: open the
-**Security** tab and choose **Report a vulnerability**. If that is unavailable
-to you, contact the SkyPorch maintainers privately through your existing
-SkyPorch support channel. Do not open a public issue.
+The SDK requires a trusted HTTPS gateway and a token provider bound to a stable
+customer. The backend, not the SDK, authorizes tenant/customer ownership. Reset
+the native session before switching users; cancel and fence headless requests in
+your own app. No management token or signing key belongs in a client bundle.
 
-## What to expect
+This candidate is unreleased. No supported-version or security-response SLA is
+claimed yet. Review [release gates](COMPATIBILITY.md) before production adoption.
 
-- Acknowledgement within 3 business days.
-- A status update at least every 7 days while the report is open.
-- Coordinated disclosure within 90 days of the report, or sooner once a fix
-  ships. Tell us if you intend to publish earlier so a fix can be prepared.
+## Coordinated disclosure
+
+Please give maintainers a chance to ship a fix before publishing details,
+and tell us when you intend to publish so a fix and an advisory can be
+prepared alongside it. Reporters who want credit in the advisory should say
+so in the report. No response time is promised while this candidate is
+unreleased; see the statement above.

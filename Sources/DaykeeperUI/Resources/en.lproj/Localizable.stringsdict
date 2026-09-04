@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Counted text. English needs one and other; a translation may add zero, two,
+  few or many without any change to the Swift call sites.
+-->
+<plist version="1.0">
+<dict>
+	<key>daykeeper.unread_count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>%ld unread message</string>
+			<key>other</key>
+			<string>%ld unread messages</string>
+		</dict>
+	</dict>
+	<key>daykeeper.attachments</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>This message includes 1 attachment. Attachment viewing is not available in this SDK candidate.</string>
+			<key>other</key>
+			<string>This message includes %ld attachments. Attachment viewing is not available in this SDK candidate.</string>
+		</dict>
+	</dict>
+</dict>
+</plist>
