@@ -50,3 +50,6 @@ maintainer approval. Document incompatible API changes in the changelog. Before
 1.0, a breaking change increments the minor version; afterwards it increments
 the major version. A release must reference an immutable contract tag and pass
 all gates in [COMPATIBILITY.md](COMPATIBILITY.md). Never retarget a published tag.
+
+Keep the repository publishable: examples, fixtures, and documentation must not
+name downstream products, consuming applications, or their hostnames.

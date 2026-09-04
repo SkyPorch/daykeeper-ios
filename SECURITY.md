@@ -15,3 +15,11 @@ your own app. No management token or signing key belongs in a client bundle.
 
 This candidate is unreleased. No supported-version or security-response SLA is
 claimed yet. Review [release gates](COMPATIBILITY.md) before production adoption.
+
+## Coordinated disclosure
+
+Please give maintainers a chance to ship a fix before publishing details,
+and tell us when you intend to publish so a fix and an advisory can be
+prepared alongside it. Reporters who want credit in the advisory should say
+so in the report. No response time is promised while this candidate is
+unreleased; see the statement above.
