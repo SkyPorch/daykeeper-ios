@@ -1,0 +1,442 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		59BB35896AF8C8AE15C35471 /* DaykeeperUI in Frameworks */ = {isa = PBXBuildFile; productRef = 4D99F8EA844AB732D6CECE6A /* DaykeeperUI */; };
+		8C430C23AC915FCE7DE11C10 /* DaykeeperExampleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00A6E57A87B40E6A2AEDF05F /* DaykeeperExampleApp.swift */; };
+		B439D1D19BE73D7CDDDEAC44 /* Daykeeper in Frameworks */ = {isa = PBXBuildFile; productRef = 7B8606B77047908CC2FD4C34 /* Daykeeper */; };
+		DEF77810DCF3D8D54C6D64A5 /* MessengerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D436ADD6284B5BB4AB26DA /* MessengerTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		E07A3505F82B0B0BBEF23FAB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BE28038536F54031317C0D54 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B5716A10E2B6A2B1A5FDB7C2;
+			remoteInfo = DaykeeperExample;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		00A6E57A87B40E6A2AEDF05F /* DaykeeperExampleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaykeeperExampleApp.swift; sourceTree = "<group>"; };
+		09602293B55FFBFBAFDAC09F /* DaykeeperExample.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = DaykeeperExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		783B10BA06AC2176DD85891D /* DaykeeperExampleUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DaykeeperExampleUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20F607AA317F3AEF71281CF /* daykeeper-ios */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "daykeeper-ios"; path = ../..; sourceTree = SOURCE_ROOT; };
+		E7D436ADD6284B5BB4AB26DA /* MessengerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessengerTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		6AD6AA741F51F976834DEDE4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B439D1D19BE73D7CDDDEAC44 /* Daykeeper in Frameworks */,
+				59BB35896AF8C8AE15C35471 /* DaykeeperUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		02764E2E5B844E51073DE414 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				09602293B55FFBFBAFDAC09F /* DaykeeperExample.app */,
+				783B10BA06AC2176DD85891D /* DaykeeperExampleUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		847E17195DC214F0FD9B817C = {
+			isa = PBXGroup;
+			children = (
+				F3FC5FFC82702F28DF075BDD /* App */,
+				B89B90CCAD546F01DA8B1E7A /* Packages */,
+				FBB84FCAB691B10683750CE2 /* UITests */,
+				02764E2E5B844E51073DE414 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B89B90CCAD546F01DA8B1E7A /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				A20F607AA317F3AEF71281CF /* daykeeper-ios */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		F3FC5FFC82702F28DF075BDD /* App */ = {
+			isa = PBXGroup;
+			children = (
+				00A6E57A87B40E6A2AEDF05F /* DaykeeperExampleApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		FBB84FCAB691B10683750CE2 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				E7D436ADD6284B5BB4AB26DA /* MessengerTests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B5716A10E2B6A2B1A5FDB7C2 /* DaykeeperExample */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AD01A939B0FB44B17BC061E6 /* Build configuration list for PBXNativeTarget "DaykeeperExample" */;
+			buildPhases = (
+				1D5F5833A7F7905537E34B94 /* Sources */,
+				6AD6AA741F51F976834DEDE4 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DaykeeperExample;
+			packageProductDependencies = (
+				7B8606B77047908CC2FD4C34 /* Daykeeper */,
+				4D99F8EA844AB732D6CECE6A /* DaykeeperUI */,
+			);
+			productName = DaykeeperExample;
+			productReference = 09602293B55FFBFBAFDAC09F /* DaykeeperExample.app */;
+			productType = "com.apple.product-type.application";
+		};
+		F96A9428C0E17394400E4FE6 /* DaykeeperExampleUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FB56C6FE11F41669F06AC9AE /* Build configuration list for PBXNativeTarget "DaykeeperExampleUITests" */;
+			buildPhases = (
+				3A915C498F316E56B6D1057D /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8AB165ACF696BB43C32695A0 /* PBXTargetDependency */,
+			);
+			name = DaykeeperExampleUITests;
+			packageProductDependencies = (
+			);
+			productName = DaykeeperExampleUITests;
+			productReference = 783B10BA06AC2176DD85891D /* DaykeeperExampleUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		BE28038536F54031317C0D54 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					F96A9428C0E17394400E4FE6 = {
+						TestTargetID = B5716A10E2B6A2B1A5FDB7C2;
+					};
+				};
+			};
+			buildConfigurationList = F764389DC19D95F37FCCA474 /* Build configuration list for PBXProject "DaykeeperExample" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 847E17195DC214F0FD9B817C;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				EC1759FD9F3A331C1F1BE38F /* XCLocalSwiftPackageReference "../.." */,
+			);
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B5716A10E2B6A2B1A5FDB7C2 /* DaykeeperExample */,
+				F96A9428C0E17394400E4FE6 /* DaykeeperExampleUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1D5F5833A7F7905537E34B94 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8C430C23AC915FCE7DE11C10 /* DaykeeperExampleApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3A915C498F316E56B6D1057D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DEF77810DCF3D8D54C6D64A5 /* MessengerTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8AB165ACF696BB43C32695A0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B5716A10E2B6A2B1A5FDB7C2 /* DaykeeperExample */;
+			targetProxy = E07A3505F82B0B0BBEF23FAB /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		4AA259744834DCFC8C2D8B73 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.skyporch.daykeeper.example;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		71DC512E49DD56D0C9547D33 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		7759E90FB2C70D8FFBCBC953 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.skyporch.daykeeper.example;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F37EBBFF55081893E2CCEC3A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.skyporch.daykeeper.example.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = DaykeeperExample;
+			};
+			name = Debug;
+		};
+		F3E93D4E7EEB129CE740E137 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.skyporch.daykeeper.example.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = DaykeeperExample;
+			};
+			name = Release;
+		};
+		FC6AF5C600EAB92C0D635325 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AD01A939B0FB44B17BC061E6 /* Build configuration list for PBXNativeTarget "DaykeeperExample" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7759E90FB2C70D8FFBCBC953 /* Debug */,
+				4AA259744834DCFC8C2D8B73 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F764389DC19D95F37FCCA474 /* Build configuration list for PBXProject "DaykeeperExample" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FC6AF5C600EAB92C0D635325 /* Debug */,
+				71DC512E49DD56D0C9547D33 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FB56C6FE11F41669F06AC9AE /* Build configuration list for PBXNativeTarget "DaykeeperExampleUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F37EBBFF55081893E2CCEC3A /* Debug */,
+				F3E93D4E7EEB129CE740E137 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		EC1759FD9F3A331C1F1BE38F /* XCLocalSwiftPackageReference "../.." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4D99F8EA844AB732D6CECE6A /* DaykeeperUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DaykeeperUI;
+		};
+		7B8606B77047908CC2FD4C34 /* Daykeeper */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Daykeeper;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = BE28038536F54031317C0D54 /* Project object */;
+}

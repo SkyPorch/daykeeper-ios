@@ -1,0 +1,48 @@
+name: DaykeeperExample
+options:
+  deploymentTarget:
+    iOS: "15.0"
+packages:
+  Daykeeper:
+    path: ../..
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+    CODE_SIGNING_ALLOWED: NO
+    GENERATE_INFOPLIST_FILE: YES
+targets:
+  DaykeeperExample:
+    type: application
+    platform: iOS
+    sources: [App]
+    dependencies:
+      - package: Daykeeper
+        product: Daykeeper
+      - package: Daykeeper
+        product: DaykeeperUI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.skyporch.daykeeper.example
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
+  DaykeeperExampleUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: DaykeeperExample
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.skyporch.daykeeper.example.uitests
+schemes:
+  DaykeeperExample:
+    build:
+      targets:
+        DaykeeperExample: all
+        DaykeeperExampleUITests: [test]
+    test:
+      targets: [DaykeeperExampleUITests]
+      parallelizable: false
