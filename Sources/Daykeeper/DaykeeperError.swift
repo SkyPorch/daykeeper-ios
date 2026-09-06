@@ -43,21 +43,24 @@ public struct DaykeeperError: Error, Sendable, Equatable, Codable, CustomStringC
       nextAction: nextAction)
   }
 
-  /// The gateway's error vocabulary is open: it gains codes without an SDK
-  /// release, and a consuming app switches on them, so the SDK checks the shape
-  /// of a code rather than matching it against a list it would have to chase.
-  /// The rule is `^[a-z][a-z0-9_]{2,63}$`. Anything else — a free-form English
-  /// sentence, an upper-case or hyphenated token, a value that is not a JSON
-  /// string at all — is not a code and collapses to `daykeeper_request_failed`,
-  /// which is what keeps server prose out of a client-visible error. The
-  /// envelope's `message` field is never read for the same reason.
+  /// Only codes from the reviewed customer-gateway vocabulary may cross the
+  /// SDK boundary. Shape alone is insufficient: token-like values such as
+  /// `sk_live_123` must never become client-visible error codes. Unknown or
+  /// malformed values collapse to `daykeeper_request_failed`; the envelope's
+  /// `message` field is never read.
+  private static let safeCodes: Set<String> = [
+    "missing_bearer_token", "invalid_bearer_token", "invalid_token", "invalid_tenant",
+    "unsupported_token", "invalid_signature", "invalid_issuer", "invalid_audience",
+    "invalid_subject", "invalid_expiration", "expired_token", "token_lifetime_too_long",
+    "unknown_tenant", "insufficient_scope", "erasure_targets_do_not_match_token",
+    "unknown_campaign", "widget_token_required", "not_found", "support_upstream_rejected",
+    "support_upstream_unavailable", "support_gateway_request_failed", "conversation_not_found",
+    "daykeeper_usage_limit_exceeded", "daykeeper_usage_not_enabled",
+    "daykeeper_support_not_ready", "daykeeper_resource_conflict",
+    "daykeeper_support_unavailable", "rate_limited", "widget_unavailable",
+  ]
+
   internal static func isSafeCode(_ value: String) -> Bool {
-    let scalars = value.unicodeScalars
-    guard (3...64).contains(scalars.count), let first = scalars.first,
-      ("a"..."z").contains(first)
-    else { return false }
-    return scalars.dropFirst().allSatisfy {
-      ("a"..."z").contains($0) || ("0"..."9").contains($0) || $0 == "_"
-    }
+    safeCodes.contains(value)
   }
 }

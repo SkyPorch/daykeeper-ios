@@ -167,11 +167,14 @@ public final class DaykeeperClient: @unchecked Sendable {
             let code =
               hint?.error.flatMap { DaykeeperError.isSafeCode($0) ? $0 : nil }
               ?? "daykeeper_request_failed"
+            let retryable =
+              code != "widget_unavailable"
+              && !write
+              && (hint?.retryable
+                ?? (response.status == 408 || response.status == 429 || response.status >= 500))
             throw DaykeeperError(
               code, status: response.status,
-              retryable: !write
-                && (hint?.retryable
-                  ?? (response.status == 408 || response.status == 429 || response.status >= 500)),
+              retryable: retryable,
               nextAction: hint?.nextAction.flatMap(DaykeeperNextAction.init(rawValue:))
             )
           }
