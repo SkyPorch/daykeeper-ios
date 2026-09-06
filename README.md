@@ -112,9 +112,14 @@ let sent = try await client.sendMessage(in: conversationID, content: "Hello")
 
 The other customer operations are `getIdentity`, `createConversation`,
 `markConversationSeen`, and `claimAnonymousConversation(widgetToken:)`.
-Claim requires an anonymous widget possession token; the native view does not
-create an anonymous widget session. Account provisioning, billing, lifecycle
-campaigns, and erasure are backend-only operations and are not exposed here.
+The headless client covers API-only inbox operations (conversation, unread, and
+message access). `getIdentity` and `claimAnonymousConversation(widgetToken:)`
+are widget operations: they require a widget-enabled tenant gateway and an
+anonymous widget possession token for claims. API-only gateways reject both
+widget operations with `409` and the safe `widget_unavailable` error before
+calling the conversation provider. The native view does not create an
+anonymous widget session. Account provisioning, billing, lifecycle campaigns,
+and erasure are backend-only operations and are not exposed here.
 
 ## Recover without accidental duplicate writes
 

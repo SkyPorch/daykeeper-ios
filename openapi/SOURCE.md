@@ -1,12 +1,11 @@
 # Contract source
 
 `customer.yaml` is the unchanged customer contract from
-[`SkyPorch/daykeeper-openapi`](https://github.com/SkyPorch/daykeeper-openapi/tree/4a2b82c9b23503073dc26fdeb5163e8869d007b8),
-commit `4a2b82c9b23503073dc26fdeb5163e8869d007b8` (unreleased; head of branch
-`codex/daykeeper-agent-credentials`, pull request SkyPorch/daykeeper-openapi#13).
+[`SkyPorch/daykeeper-openapi`](https://github.com/SkyPorch/daykeeper-openapi/tree/a4f123969e3e0e005c0a4858fee7bff17cd5a180),
+commit `a4f123969e3e0e005c0a4858fee7bff17cd5a180` (unreleased).
 
-- SHA-256: `ae75711072950c786d69401301292659ece7f37461cf0621ae4f8a58836b82bd`
-- Git blob: `9cdf5423e73ad8008fc62adeb8c66e3c018c357d`
+- SHA-256: `322158cd5fa5c54a054d701ff64a9c8b07cad477414d7df83ba5a3aa7ee06cc3`
+- Git blob: `bf566c97a541ac5e4e1f04670fb3b65475b635a6`
 - License: Apache-2.0; retained verbatim in this directory's `LICENSE`.
 
 Change from the previous snapshot: `CustomerError` is now an open envelope
@@ -18,6 +17,8 @@ Swift models are handwritten, not generated. Tests exercise representative wire
 shapes and all eight customer operations; decoding is not a full JSON Schema
 validator. Extra response fields are ignored for forward compatibility. Service
 operations in the source contract are deliberately absent from the customer SDK.
+Unknown customer error codes are intentionally collapsed to the safe
+`daykeeper_request_failed` fallback; only the reviewed SDK vocabulary is exposed.
 
 The message list exposes only a forward `after` cursor. There is no `before` or
 page-size parameter. The client can therefore page forward from a message it

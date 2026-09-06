@@ -32,14 +32,13 @@
   consumers as a `DaykeeperUI` resource bundle.
 - `swift test` now starts the loopback wire harness itself when node is present
   and otherwise skips with a pointer to `Scripts/check-wire.mjs`.
-- Project gateway error codes by shape (`^[a-z][a-z0-9_]{2,63}$`) instead of a
-  23-entry allowlist, matching the web and React Native SDKs. Codes the gateway
-  adds without an SDK release — `widget_token_required`, `conversation_not_found`,
-  `support_gateway_request_failed` and the rest — now reach the caller unchanged;
-  free-form prose, non-code-shaped tokens and non-string values still collapse to
-  `daykeeper_request_failed`, and the envelope's `message` is never read.
+- Project only the reviewed customer-gateway error vocabulary. Unknown,
+  token-like, free-form, and non-string values collapse to
+  `daykeeper_request_failed`; the envelope's `message` is never read.
 - Expose `DaykeeperError.nextAction` as `DaykeeperNextAction`, decoded from the
   envelope through a closed three-value allowlist (`review_usage`,
   `review_setup`, `refresh_conversation`); anything else is dropped.
+- Document API-only inbox gateways and safely surface their non-retryable
+  `widget_unavailable` refusals for widget identity and anonymous claims.
 
 No published release yet. See [COMPATIBILITY.md](COMPATIBILITY.md) for exclusions.

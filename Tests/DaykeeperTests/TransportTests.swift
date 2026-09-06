@@ -194,6 +194,61 @@ final class TransportTests: XCTestCase {
     }
   }
 
+  func testAPIOnlyWidgetRefusalsAreSafeAndNeverRetried() async throws {
+    let calls = Counter()
+    let identityStub = Stub([
+      .json(
+        409,
+        [
+          "error": "widget_unavailable", "message": "provider-secret", "retryable": true,
+        ])
+    ])
+    let identityClient = try identityStub.client { request in
+      calls.record(request.forceRefresh)
+      return "synthetic-token"
+    }
+    do {
+      _ = try await identityClient.getIdentity()
+      XCTFail("Expected API-only widget refusal")
+    } catch let error as DaykeeperError {
+      XCTAssertEqual(error.code, "widget_unavailable")
+      XCTAssertEqual(error.status, 409)
+      XCTAssertFalse(error.retryable)
+      XCTAssertFalse(error.outcomeUnknown)
+      XCTAssertFalse(String(describing: error).contains("provider-secret"))
+      XCTAssertFalse(
+        String(data: try JSONEncoder().encode(error), encoding: .utf8)!.contains("provider-secret"))
+    }
+    XCTAssertEqual(calls.all, [false])
+    XCTAssertEqual(identityStub.requests.count, 1)
+
+    let claimStub = Stub([
+      .json(
+        409,
+        [
+          "error": "widget_unavailable", "message": "provider-secret", "retryable": true,
+        ])
+    ])
+    let claimClient = try claimStub.client { request in
+      calls.record(request.forceRefresh)
+      return "synthetic-token"
+    }
+    do {
+      _ = try await claimClient.claimAnonymousConversation(widgetToken: "widget-token")
+      XCTFail("Expected API-only widget refusal")
+    } catch let error as DaykeeperError {
+      XCTAssertEqual(error.code, "widget_unavailable")
+      XCTAssertEqual(error.status, 409)
+      XCTAssertFalse(error.retryable)
+      XCTAssertFalse(error.outcomeUnknown)
+      XCTAssertFalse(String(describing: error).contains("provider-secret"))
+      XCTAssertFalse(
+        String(data: try JSONEncoder().encode(error), encoding: .utf8)!.contains("provider-secret"))
+    }
+    XCTAssertEqual(calls.all, [false, false])
+    XCTAssertEqual(claimStub.requests.count, 1)
+  }
+
   func testExplicitReadDenialSurvivesMalformedErrorCodeAndRedactsRemoteText() async throws {
     for code: Any in ["private-server-secret", ["private": "server-secret"]] {
       let stub = Stub([
@@ -315,16 +370,15 @@ final class TransportTests: XCTestCase {
     "unknown_campaign", "widget_token_required", "not_found", "support_upstream_rejected",
     "support_upstream_unavailable",
     // Codes the customer app still switches on from the pre-gateway support
-    // stack and from services in front of the gateway. The contract calls codes
-    // extensible and the SDK must not decide which ones are real.
+    // stack and from services in front of the gateway.
     "support_gateway_request_failed", "conversation_not_found",
     "daykeeper_usage_limit_exceeded", "daykeeper_usage_not_enabled",
     "daykeeper_support_not_ready", "daykeeper_resource_conflict",
-    "daykeeper_support_unavailable", "rate_limited",
+    "daykeeper_support_unavailable", "rate_limited", "widget_unavailable",
   ]
 
   func testEveryGatewayErrorCodeReachesTheCallerUnchanged() async throws {
-    XCTAssertEqual(Self.gatewayErrorCodes.count, 28)
+    XCTAssertEqual(Self.gatewayErrorCodes.count, 29)
     XCTAssertEqual(Set(Self.gatewayErrorCodes).count, Self.gatewayErrorCodes.count)
     for code in Self.gatewayErrorCodes {
       let stub = Stub([.json(403, ["error": code])])
@@ -338,28 +392,28 @@ final class TransportTests: XCTestCase {
     }
   }
 
-  func testCodeShapeRuleAcceptsOnlyCodeShapedStrings() throws {
-    for value in ["abc", "not_found", "a1_b2_c3", String(repeating: "a", count: 64), "ab0"] {
+  func testKnownSafeCodeSetRejectsTokenLikeAndUnknownValues() throws {
+    for value in ["not_found", "widget_unavailable", "support_upstream_rejected"] {
       XCTAssertTrue(DaykeeperError.isSafeCode(value), value)
     }
     for value in [
-      "ab", String(repeating: "a", count: 65), "", "Not_Found", "not-found", "not found",
-      " not_found", "not_found\n", "_not_found", "1not_found", "not_found\u{0000}", "nöt_found",
+      "abc", "ab", String(repeating: "a", count: 65), "", "Not_Found", "not-found", "not found",
+      "sk_live_123", "support_brand_new_condition", "future_unknown_code", "not_found\n",
+      "nöt_found",
     ] {
       XCTAssertFalse(DaykeeperError.isSafeCode(value), value)
     }
   }
 
-  func testACodeTheSDKHasNeverSeenIsStillHandedToTheCaller() async throws {
-    // The gateway can ship a new code before the SDK does; that must not become
-    // a silent contract break in the consuming app's switch statement.
-    for code in ["support_brand_new_condition", "invalid_future_claim", "ab0"] {
+  func testUnknownAndTokenLikeRemoteCodesCollapseWithoutLeakage() async throws {
+    for code in ["support_brand_new_condition", "future_unknown_code", "sk_live_123"] {
       let stub = Stub([.json(400, ["error": code])])
       do {
         _ = try await stub.client().getUnread()
-        XCTFail("Expected \(code) to surface")
+        XCTFail("Expected \(code) to be rejected")
       } catch {
-        XCTAssertEqual((error as? DaykeeperError)?.code, code)
+        XCTAssertEqual((error as? DaykeeperError)?.code, "daykeeper_request_failed")
+        XCTAssertFalse(String(describing: error).contains(code))
       }
     }
   }
