@@ -111,7 +111,10 @@ let sent = try await client.sendMessage(in: conversationID, content: "Hello")
 ```
 
 The other customer operations are `getIdentity`, `createConversation`,
-`markConversationSeen`, and `claimAnonymousConversation(widgetToken:)`.
+`markConversationSeen`, and `claimAnonymousConversation(widgetToken:)`. On an
+API-only inbox gateway, `getIdentity` and `claimAnonymousConversation` are
+unsupported and return the contract's `API_ONLY_WIDGET_OPERATION` 409 response;
+use the API-only conversation operations instead.
 Claim requires an anonymous widget possession token; the native view does not
 create an anonymous widget session. Account provisioning, billing, lifecycle
 campaigns, and erasure are backend-only operations and are not exposed here.

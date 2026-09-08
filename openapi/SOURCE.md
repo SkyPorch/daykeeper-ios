@@ -8,9 +8,10 @@ commit `c9a0175d0053f1a2d57c9329f6d3a36ec6acdb71`.
 - Git blob: `bf566c97a541ac5e4e1f04670fb3b65475b635a6`
 - License: Apache-2.0; retained verbatim in this directory's `LICENSE`.
 
-Change from the previous snapshot: `CustomerError` is now an open envelope
-(`additionalProperties: true`). The gateway may add fields to an error body, and
-`message`, `retryable` and `nextAction` are optional. This client already ignores
+Changes from the previous snapshot include an open `CustomerError` envelope
+(`additionalProperties: true`) and an explicit API-only gateway restriction:
+`getIdentity` and `claimAnonymousConversation` return the stable
+`API_ONLY_WIDGET_OPERATION` 409 response there. This client already ignores
 unknown fields, so an added field must never be treated as a decode failure.
 
 Swift models are handwritten, not generated. Tests exercise representative wire

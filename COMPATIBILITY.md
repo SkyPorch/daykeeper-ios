@@ -10,7 +10,7 @@ certification is implied by the source or CI checks.
 | --- | --- | --- |
 | SwiftPM | Headless and SwiftUI products; native example imports the package | Approved tag and external clean tagged-install receipt |
 | CocoaPods | Separate `Daykeeper` and `DaykeeperUI` source specs; CocoaPods 1.16.2 metadata and local consumer builds | Approved tag, trunk ownership/publication and clean exact-registry consumer receipt |
-| Customer API | Eight operations, typed decoding, safe errors, prefix routing | Deployed tenant/gateway contract parity |
+| Customer API | Eight operations, typed decoding, safe errors, prefix routing | Deployed tenant/gateway contract parity; API-only gateways reject identity and anonymous-claim widget operations with 409 |
 | Transport | Real URLSession redirect, cookie/cache isolation, token refresh, stream/deadline/cancellation and write-attempt tests | TLS chain, proxy/load-balancer and physical-network matrix |
 | Native messenger | List/history/plain-text send/seen, drafts, logout, account switching and fresh-read recovery guards | Full support feature parity beyond the tested customer-support core |
 | Lifecycle | Background masking, draft preservation, late-result fencing | Physical-device/app-switcher privacy verification |
