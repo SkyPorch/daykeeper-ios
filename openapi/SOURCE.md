@@ -1,17 +1,17 @@
 # Contract source
 
-`customer.yaml` is the unchanged customer contract from
-[`SkyPorch/daykeeper-openapi`](https://github.com/SkyPorch/daykeeper-openapi/tree/4a2b82c9b23503073dc26fdeb5163e8869d007b8),
-commit `4a2b82c9b23503073dc26fdeb5163e8869d007b8` (unreleased; head of branch
-`codex/daykeeper-agent-credentials`, pull request SkyPorch/daykeeper-openapi#13).
+`customer.yaml` is an exact copy from the immutable `v1.1.0` release of
+[`SkyPorch/daykeeper-openapi`](https://github.com/SkyPorch/daykeeper-openapi/releases/tag/v1.1.0),
+commit `c9a0175d0053f1a2d57c9329f6d3a36ec6acdb71`.
 
-- SHA-256: `ae75711072950c786d69401301292659ece7f37461cf0621ae4f8a58836b82bd`
-- Git blob: `9cdf5423e73ad8008fc62adeb8c66e3c018c357d`
+- SHA-256: `322158cd5fa5c54a054d701ff64a9c8b07cad477414d7df83ba5a3aa7ee06cc3`
+- Git blob: `bf566c97a541ac5e4e1f04670fb3b65475b635a6`
 - License: Apache-2.0; retained verbatim in this directory's `LICENSE`.
 
-Change from the previous snapshot: `CustomerError` is now an open envelope
-(`additionalProperties: true`). The gateway may add fields to an error body, and
-`message`, `retryable` and `nextAction` are optional. This client already ignores
+Changes from the previous snapshot include an open `CustomerError` envelope
+(`additionalProperties: true`) and an explicit API-only gateway restriction:
+`getIdentity` and `claimAnonymousConversation` return the stable
+`API_ONLY_WIDGET_OPERATION` 409 response there. This client already ignores
 unknown fields, so an added field must never be treated as a decode failure.
 
 Swift models are handwritten, not generated. Tests exercise representative wire
