@@ -87,8 +87,12 @@ public final class DaykeeperClient: @unchecked Sendable {
     guard after == nil || before == nil else { throw DaykeeperError("INVALID_CONFIGURATION") }
     if let after { try Self.positive(after) }
     if let before { try Self.positive(before) }
-    let query = after.map { "?after=\($0)" } ?? before.map { "?before=\($0)" } ?? ""
+    var queryItems = ["pagination=cursor"]
+    if let after { queryItems.append("after=\(after)") }
+    if let before { queryItems.append("before=\(before)") }
+    let query = "?" + queryItems.joined(separator: "&")
     return try await request("/v1/conversations/\(conversationID)/messages\(query)") {
+      guard $0.pagination == "cursor" else { throw DaykeeperError("INVALID_RESPONSE") }
       try Self.validate($0.messages, conversationID: conversationID)
       let ids = $0.messages.map(\.id)
       guard ids == ids.sorted(),

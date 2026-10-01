@@ -159,6 +159,9 @@ CocoaPods consumer building the package in Debug gets the local-fixture
 convenience; a Release build of the SDK refuses every unencrypted base URL, so
 it cannot be reached in a shipped app.
 
+Message reads opt into the gateway's marked cursor profile. A gateway that
+ignores the opt-in and returns the legacy envelope is rejected as an invalid
+response; deploy a compatible gateway before enabling this candidate.
 Opening a conversation loads the latest 20 customer-visible messages. Use the
 Load older messages control to page backward; it stays available after a short
 non-empty page and disappears only after an empty page. Refreshing an open

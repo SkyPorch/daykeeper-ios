@@ -105,7 +105,9 @@ private actor CustomerFixture: CustomerAPI {
     } else {
       visible = Array(history.suffix(20))
     }
-    return try decode("{\"messages\":[\(visible.map(Self.messageJSON).joined(separator: ","))]}")
+    return try decode(
+      "{\"pagination\":\"cursor\",\"messages\":[\(visible.map(Self.messageJSON).joined(separator: ","))]}"
+    )
   }
   func createConversation() async throws -> DaykeeperConversationResult {
     creates += 1

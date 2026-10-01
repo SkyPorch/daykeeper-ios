@@ -2,22 +2,24 @@
 
 `customer.yaml` is an exact copy of `openapi/customer.yaml` from the local,
 unreleased canonical `SkyPorch/daykeeper-openapi` commit
-`f7771f5ce1d48140ddbf38a113aeec60651b8d79`. No release tag exists for this
+`325c9496ab40fbb7da60f2fc75d57c9d5e1c2b39`. No release tag exists for this
 commit.
 
-- SHA-256: `1072bb8df15e4f96bb9463f8bb77d9b5a7b0b97d762ee25599bee6f81dd55b51`
-- Git blob: `7285478b62e6ec33b2c35e7503508a73930433b8`
+- SHA-256: `6a72fea574acd85dfb678b3b63c927bb3ea6506814baa6f0e774842947c64b83`
+- Git blob: `77d27d4603c5bfd16b97fb3fd517e429078113e2`
 - License: Apache-2.0; retained verbatim in this directory's `LICENSE`.
 
-The contract adds mutually exclusive positive `before` and `after` message
-cursors. The initial read returns the latest 20 customer-visible messages in
-ascending order; `before` returns up to 20 older messages; `after` returns up to
-20 newer messages. Each response is capped at 768 KiB of UTF-8 JSON: initial and
-older pages keep the newest contiguous suffix that fits, while newer pages keep
-the oldest prefix. If one message alone exceeds the cap, the gateway returns
-`413 message_too_large`. Clients should continue loading older pages until an
-empty page, since a short page alone does not prove exhaustion after defensive
-filtering.
+The contract supports two response profiles. Requests without `pagination=cursor`
+retain the legacy envelope and identifier behavior. Cursor mode is explicitly
+opted into with `pagination=cursor` on every initial, `after`, and `before`
+request; those responses require a top-level `pagination: "cursor"` marker.
+Initial and `before` pages return up to 20 customer-visible messages, keeping
+the newest contiguous suffix that fits a 768 KiB UTF-8 JSON envelope; `after`
+pages return up to 20, keeping the oldest prefix. Cursor-mode message IDs must
+be positive safe integers. A single message that exceeds the envelope returns
+`413 message_too_large`; an unsafe provider identifier returns
+`502 message_id_out_of_range`. Clients continue loading older pages until an
+empty page, since a short page alone does not prove exhaustion after filtering.
 
 Swift models are handwritten, not generated. Tests exercise representative wire
 shapes and all eight customer operations; decoding is not a full JSON Schema

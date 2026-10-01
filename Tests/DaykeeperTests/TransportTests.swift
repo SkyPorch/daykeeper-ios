@@ -114,7 +114,8 @@ final class TransportTests: XCTestCase {
       .json(
         200, ["unreadCount": 2, "conversation": conversation, "conversations": [conversation]]),
       .json(200, ["conversationId": 7, "seen": true, "seenAt": 123]),
-      .json(200, ["messages": [message]]), .json(200, ["messages": [message]]),
+      .json(200, ["pagination": "cursor", "messages": [message]]),
+      .json(200, ["pagination": "cursor", "messages": [message]]),
       .json(201, ["message": message]), .json(200, ["status": "merged", "conversations": 1]),
     ])
     let client = try stub.client()
@@ -135,9 +136,11 @@ final class TransportTests: XCTestCase {
       [
         "/support-api/v1/identity", "/support-api/v1/conversations",
         "/support-api/v1/conversations", "/support-api/v1/unread",
-        "/support-api/v1/conversations/7/seen", "/support-api/v1/conversations/7/messages?after=3",
-        "/support-api/v1/conversations/7/messages?before=10",
-        "/support-api/v1/conversations/7/messages", "/support-api/v1/anonymous-conversations/claim",
+        "/support-api/v1/conversations/7/seen",
+        "/support-api/v1/conversations/7/messages?pagination=cursor&after=3",
+        "/support-api/v1/conversations/7/messages?pagination=cursor&before=10",
+        "/support-api/v1/conversations/7/messages",
+        "/support-api/v1/anonymous-conversations/claim",
       ])
     XCTAssertEqual(
       stub.requests.map(\.httpMethod),
@@ -273,7 +276,10 @@ final class TransportTests: XCTestCase {
   }
 
   func testMessagePagesMustAdvancePastTheirCursor() async throws {
-    let stub = Stub([.json(200, ["messages": [message]]), .json(200, ["messages": [message]])])
+    let stub = Stub([
+      .json(200, ["pagination": "cursor", "messages": [message]]),
+      .json(200, ["pagination": "cursor", "messages": [message]]),
+    ])
     let client = try stub.client()
     do {
       _ = try await client.listMessages(in: 7, after: 10)
@@ -287,6 +293,18 @@ final class TransportTests: XCTestCase {
     } catch let error as DaykeeperError {
       XCTAssertEqual(error.code, "INVALID_RESPONSE")
     }
+  }
+
+  func testCursorModeRejectsGatewayResponseWithoutCursorMarker() async throws {
+    let stub = Stub([.json(200, ["messages": [message]])])
+    let client = try stub.client()
+    do {
+      _ = try await client.listMessages(in: 7)
+      XCTFail("A legacy response must not be treated as cursor pagination")
+    } catch let error as DaykeeperError {
+      XCTAssertEqual(error.code, "INVALID_RESPONSE")
+    }
+    XCTAssertEqual(stub.requests.first?.url?.query, "pagination=cursor")
   }
 
   func testProviderFailureIsSanitizedAndNotDispatched() async throws {
