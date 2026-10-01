@@ -29,6 +29,8 @@ private actor CustomerFixture: CustomerAPI {
   private let uncertainWrites: Bool
   private var listFailure = false
   private var historyFailure = false
+  private var failHistoryAfter: Int64?
+  private(set) var seenWrites = 0
   init(unreadAfterSeen: Int = 0, uncertainWrites: Bool = false) {
     self.unreadAfterSeen = unreadAfterSeen
     self.uncertainWrites = uncertainWrites
@@ -62,6 +64,8 @@ private actor CustomerFixture: CustomerAPI {
   func useSendResultID(_ id: Int64) { sendResultID = id }
   /// Seed the thread the gateway will serve for an uncursored read.
   func seedHistory(_ ids: [Int64]) { history = ids }
+  func appendHistory(_ ids: [Int64]) { history.append(contentsOf: ids) }
+  func failHistory(after cursor: Int64?) { failHistoryAfter = cursor }
   func getIdentityWithFreshToken() async throws -> DaykeeperCustomerIdentity {
     identityReads += 1
     if identityUnavailable { throw try failure() }
@@ -97,6 +101,7 @@ private actor CustomerFixture: CustomerAPI {
     cursors.append(after)
     beforeCursors.append(before)
     if historyFailure { throw try failure() }
+    if after == failHistoryAfter, failHistoryAfter != nil { throw try failure() }
     let visible: [Int64]
     if let before {
       visible = Array(history.filter { $0 < before }.suffix(20))
@@ -127,6 +132,7 @@ private actor CustomerFixture: CustomerAPI {
     return await withCheckedContinuation { sendContinuation = $0 }
   }
   func markConversationSeen(_ conversationID: Int64) async throws -> DaykeeperSeenResult {
+    seenWrites += 1
     if let writeAuthStatus { throw try authFailure(writeAuthStatus) }
     seen = true
     return try decode(#"{"conversationId":7,"seen":true,"seenAt":123}"#)
@@ -173,6 +179,86 @@ final class SessionTests: XCTestCase {
     XCTAssertTrue(active.canEditDraft)
     let sends = await api.sends
     XCTAssertEqual(sends, 1)
+    active.reset()
+  }
+
+  @MainActor func testUncertainSendDrainsMultiplePagesBeforeEnablingRecoveryActions() async throws {
+    let api = CustomerFixture(uncertainWrites: true)
+    await api.seedHistory(Array(1...30).map(Int64.init))
+    let active = DaykeeperMessengerSession(customerAPI: api)
+    await active.refresh()
+    await active.selectConversation(7)
+    XCTAssertEqual(active.messages.map(\.id), Array(11...30).map(Int64.init))
+    active.draft = "Keep this uncertain draft"
+    await active.sendMessage()
+    await api.appendHistory(Array(31...75).map(Int64.init))
+
+    await api.failHistory(after: 50)
+    await active.refresh()
+    XCTAssertFalse(active.canDiscardUncertainDraft)
+    XCTAssertEqual(active.draft, "Keep this uncertain draft")
+    await active.markRead()
+    let prematureSeenWrites = await api.seenWrites
+    XCTAssertEqual(prematureSeenWrites, 0, "Read markers wait until recovery catches up")
+
+    await api.failHistory(after: nil)
+    await active.refresh()
+    XCTAssertTrue(active.canDiscardUncertainDraft)
+    XCTAssertEqual(active.messages.map(\.id), Array(11...75).map(Int64.init))
+    let cursors = await api.cursors
+    XCTAssertEqual(Array(cursors.suffix(6)), [30, 50, 30, 50, 70, 75])
+    active.discardUncertainDraft()
+    XCTAssertEqual(active.draft, "")
+    let sendCount = await api.sends
+    XCTAssertEqual(sendCount, 1)
+    active.reset()
+  }
+
+  @MainActor func testForwardRefreshFailureKeepsMarkReadDisabledUntilCatchUp() async throws {
+    let api = CustomerFixture()
+    await api.seedHistory(Array(1...30).map(Int64.init))
+    let active = DaykeeperMessengerSession(customerAPI: api)
+    await active.refresh()
+    await active.selectConversation(7)
+    await api.appendHistory(Array(31...75).map(Int64.init))
+    await api.failHistory(after: 50)
+    await active.refresh()
+    XCTAssertFalse(active.canMarkRead)
+    XCTAssertEqual(active.messages.map(\.id), Array(11...30).map(Int64.init))
+    await active.markRead()
+    let prematureSeenWrites = await api.seenWrites
+    XCTAssertEqual(prematureSeenWrites, 0)
+
+    await api.failHistory(after: nil)
+    await active.refresh()
+    XCTAssertTrue(active.canMarkRead)
+    XCTAssertEqual(active.messages.map(\.id), Array(11...75).map(Int64.init))
+    await active.markRead()
+    let seenWrites = await api.seenWrites
+    XCTAssertEqual(seenWrites, 1)
+    active.reset()
+  }
+
+  @MainActor func testUncertainSendWithoutFetchedCursorReadsBothDirectionsToVerifyHistory()
+    async throws
+  {
+    let api = CustomerFixture(uncertainWrites: true)
+    let active = DaykeeperMessengerSession(customerAPI: api)
+    await active.refresh()
+    await active.selectConversation(7)
+    active.draft = "Preserve until the entire thread is reviewed"
+    await active.sendMessage()
+    await api.appendHistory(Array(1...45).map(Int64.init))
+
+    await active.refresh()
+    XCTAssertTrue(active.canDiscardUncertainDraft)
+    XCTAssertEqual(active.messages.map(\.id), Array(1...45).map(Int64.init))
+    let cursors = await api.cursors
+    XCTAssertFalse(cursors.contains(0), "Zero is not a valid customer cursor")
+    let beforeCursors = await api.beforeCursors
+    XCTAssertEqual(Array(beforeCursors.suffix(4)), [26, 6, 1, nil])
+    active.discardUncertainDraft()
+    XCTAssertEqual(active.draft, "")
     active.reset()
   }
 
@@ -477,9 +563,9 @@ final class SessionTests: XCTestCase {
     XCTAssertNil(active.error)
     XCTAssertEqual(active.messages.map(\.id), Array(1...46).map(Int64.init))
     let cursors = await api.cursors
-    XCTAssertEqual(cursors, [nil, nil, nil, nil, 45, 45])
+    XCTAssertEqual(cursors, [nil, nil, nil, nil, 45, 45, 46])
     let beforeCursors = await api.beforeCursors
-    XCTAssertEqual(beforeCursors, [nil, 26, 6, 1, nil, nil])
+    XCTAssertEqual(beforeCursors, [nil, 26, 6, 1, nil, nil, nil])
   }
 
   @MainActor func testSendResultCannotLeapfrogAnUnreadAfterPage() async throws {
@@ -492,7 +578,7 @@ final class SessionTests: XCTestCase {
 
     await api.seedHistory(Array(1...80).map(Int64.init))
     await active.refresh()
-    XCTAssertEqual(active.messages.map(\.id), Array(31...70).map(Int64.init))
+    XCTAssertEqual(active.messages.map(\.id), Array(31...80).map(Int64.init))
 
     await api.useSendResultID(81)
     await api.completeWritesImmediately()
@@ -503,7 +589,7 @@ final class SessionTests: XCTestCase {
     await active.refresh()
     XCTAssertEqual(active.messages.map(\.id), Array(31...81).map(Int64.init))
     let cursors = await api.cursors
-    XCTAssertEqual(Array(cursors.suffix(2)), [50, 70])
+    XCTAssertEqual(Array(cursors.suffix(3)), [80, 80, 81])
   }
 
 }

@@ -27,6 +27,7 @@ extension DaykeeperClient: CustomerAPI {}
   @Published public private(set) var error: DaykeeperError?
   @Published public private(set) var uncertainCreation = false
   @Published public private(set) var uncertainThreads: Set<Int64> = []
+  private var caughtUpThreads: Set<Int64> = []
   @Published public var draft = ""
   @Published private var reviewedUncertainThreads: Set<Int64> = []
   @Published private var creationReviewed = false
@@ -78,6 +79,12 @@ extension DaykeeperClient: CustomerAPI {}
       && uncertainCreation && creationReviewed
   }
 
+  public var canMarkRead: Bool {
+    guard !isBusy, !isSuspended, !isSignedOut, let id = selectedConversationID else { return false }
+    return caughtUpThreads.contains(id)
+      && (!uncertainThreads.contains(id) || reviewedUncertainThreads.contains(id))
+  }
+
   public func refresh() async {
     guard !isBusy, !isSuspended, !isSignedOut else { return }
     let selected = selectedConversationID
@@ -86,10 +93,14 @@ extension DaykeeperClient: CustomerAPI {}
     // The initial request loads the latest visible page; subsequent refreshes
     // ask only for messages newer than the last one fetched from the server.
     let cursor = selected.flatMap { fetchedThrough[$0] }
+    let reviewingUncertainThread = selected.map { uncertainThreads.contains($0) } ?? false
+    if let selected { caughtUpThreads.remove(selected) }
     await perform { api in
       let list = try await api.listConversations()
       let messages = try await selected.mapAsync {
-        try await api.listMessages(in: $0, after: cursor, before: nil).messages
+        try await self.fetchMessages(
+          from: api, conversationID: $0, after: cursor,
+          drainToLatest: cursor != nil || reviewingUncertainThread)
       }
       return (list.conversations, messages)
     } success: { result in
@@ -97,7 +108,7 @@ extension DaykeeperClient: CustomerAPI {}
       if let messages = result.1 {
         if cursor == nil {
           self.replaceMessages(messages)
-          self.hasOlderMessages = !messages.isEmpty
+          self.hasOlderMessages = !reviewingUncertainThread && !messages.isEmpty
         } else {
           self.mergeMessages(messages)
         }
@@ -109,6 +120,7 @@ extension DaykeeperClient: CustomerAPI {}
         self.reviewedUncertainThreads.insert(selected)
       }
       if selected == nil && self.uncertainCreation { self.creationReviewed = true }
+      if let selected { self.caughtUpThreads.insert(selected) }
     }
   }
 
@@ -118,18 +130,23 @@ extension DaykeeperClient: CustomerAPI {}
     }
     saveDraft()
     reviewedUncertainThreads.remove(id)
+    caughtUpThreads.remove(id)
+    let reviewingUncertainThread = uncertainThreads.contains(id)
     await perform {
-      try await $0.listMessages(in: id, after: nil, before: nil)
+      try await self.fetchMessages(
+        from: $0, conversationID: id, after: nil, drainToLatest: reviewingUncertainThread)
     } success: { result in
       self.selectedConversationID = id
-      self.replaceMessages(result.messages)
-      self.hasOlderMessages = !result.messages.isEmpty
-      if let fetched = result.messages.last?.id {
+      self.replaceMessages(result)
+      self.hasOlderMessages = !result.isEmpty
+      if let fetched = result.last?.id {
         self.fetchedThrough[id] = fetched
       } else {
         self.fetchedThrough[id] = nil
       }
+      self.hasOlderMessages = !reviewingUncertainThread && !result.isEmpty
       self.draft = self.drafts[id] ?? ""
+      self.caughtUpThreads.insert(id)
       if self.uncertainThreads.contains(id) { self.reviewedUncertainThreads.insert(id) }
     }
   }
@@ -173,6 +190,7 @@ extension DaykeeperClient: CustomerAPI {}
         self.replaceMessages([])
         self.hasOlderMessages = false
         self.fetchedThrough[result.conversation.id] = nil
+        self.caughtUpThreads.insert(result.conversation.id)
         self.draft = ""
       })
   }
@@ -185,13 +203,14 @@ extension DaykeeperClient: CustomerAPI {}
       write: .message(id), action: { try await $0.sendMessage(in: id, content: content) },
       success: { result in
         self.mergeMessages([result.message])
+        self.caughtUpThreads.remove(id)
         self.draft = ""
         self.drafts[id] = nil
       })
   }
 
   public func markRead() async {
-    guard let id = selectedConversationID else { return }
+    guard canMarkRead, let id = selectedConversationID else { return }
     // A read marker is still a write: it is never retried automatically.
     var confirmed = false
     await perform(
@@ -228,13 +247,14 @@ extension DaykeeperClient: CustomerAPI {}
     suspendedSelection = selectedConversationID
     invalidate()
     reviewedUncertainThreads = []
+    caughtUpThreads = []
     creationReviewed = false
     isSuspended = true
     conversations = []
     replaceMessages([])
     selectedConversationID = nil
     hasOlderMessages = false
-    fetchedThrough = [:]
+    fetchedThrough = fetchedThrough.filter { uncertainThreads.contains($0.key) }
     draft = ""
     error = nil
   }
@@ -265,6 +285,7 @@ extension DaykeeperClient: CustomerAPI {}
     uncertainCreation = false
     uncertainThreads = []
     reviewedUncertainThreads = []
+    caughtUpThreads = []
     creationReviewed = false
     identityBaseline = nil
     markerRecoveryRevision = nil
@@ -276,6 +297,43 @@ extension DaykeeperClient: CustomerAPI {}
 
   private func replaceMessages(_ values: [DaykeeperMessage]) {
     messages = values.sorted { $0.id < $1.id }
+  }
+
+  /// An uncertain send can land beyond the first page returned during recovery. Do not enable
+  /// discard/retry actions until every newer page has been read and an empty page proves catch-up.
+  private func fetchMessages(
+    from api: any CustomerAPI, conversationID: Int64, after cursor: Int64?, drainToLatest: Bool
+  ) async throws -> [DaykeeperMessage] {
+    var page = try await api.listMessages(in: conversationID, after: cursor, before: nil).messages
+    guard drainToLatest, !page.isEmpty else { return page }
+    var result = page
+    if cursor == nil {
+      var olderPages: [[DaykeeperMessage]] = []
+      var before = page.first?.id
+      while let beforeCursor = before {
+        let older = try await api.listMessages(
+          in: conversationID, after: nil, before: beforeCursor
+        ).messages
+        guard !older.isEmpty else { break }
+        guard let oldest = older.first?.id, oldest < beforeCursor else {
+          throw URLError(.badServerResponse)
+        }
+        olderPages.append(older)
+        before = oldest
+      }
+      result = olderPages.reversed().flatMap { $0 } + result
+    }
+    var after = page.last?.id ?? cursor
+    while !page.isEmpty {
+      page = try await api.listMessages(in: conversationID, after: after, before: nil).messages
+      guard !page.isEmpty else { break }
+      guard let next = page.last?.id, next > (after ?? 0) else {
+        throw URLError(.badServerResponse)
+      }
+      result.append(contentsOf: page)
+      after = next
+    }
+    return result
   }
 
   /// Pages arrive newest-side first and may overlap after a resend or a seen
@@ -344,6 +402,7 @@ extension DaykeeperClient: CustomerAPI {}
     case .message(let id):
       uncertainThreads.insert(id)
       reviewedUncertainThreads.remove(id)
+      caughtUpThreads.remove(id)
     case .marker, .none: break
     }
   }

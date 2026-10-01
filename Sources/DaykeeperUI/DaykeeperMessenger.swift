@@ -245,7 +245,7 @@ public struct DaykeeperMessenger: View {
           session.isDraftTooLong ? daykeeperText("daykeeper.composer.limit_hint") : "")
       }.padding()
       Button(daykeeperText("daykeeper.mark_read")) { Task { await session.markRead() } }
-        .disabled(session.isBusy).padding(.bottom)
+        .disabled(!session.canMarkRead).padding(.bottom)
         .accessibilityIdentifier("daykeeper.mark-read")
     }
   }

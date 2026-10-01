@@ -259,6 +259,12 @@ final class TransportTests: XCTestCase {
         XCTFail("Expected invalid ID")
       } catch let error as DaykeeperError { XCTAssertEqual(error.code, "INVALID_CONFIGURATION") }
     }
+    for cursor in [Int64(0), -1] {
+      do {
+        _ = try await client.listMessages(in: 7, after: cursor)
+        XCTFail("Cursor values must be positive")
+      } catch let error as DaykeeperError { XCTAssertEqual(error.code, "INVALID_CONFIGURATION") }
+    }
     for content in [" \n", String(repeating: "😀", count: 8001)] {
       do {
         _ = try await client.sendMessage(in: 7, content: content)
