@@ -92,7 +92,8 @@ public final class DaykeeperClient: @unchecked Sendable {
       try Self.validate($0.messages, conversationID: conversationID)
       let ids = $0.messages.map(\.id)
       guard ids == ids.sorted(),
-        ids.allSatisfy({ id in (after.map { id > $0 } ?? true) && (before.map { id < $0 } ?? true) })
+        ids.allSatisfy({ id in (after.map { id > $0 } ?? true) && (before.map { id < $0 } ?? true) }
+        )
       else { throw DaykeeperError("INVALID_RESPONSE") }
     }
   }

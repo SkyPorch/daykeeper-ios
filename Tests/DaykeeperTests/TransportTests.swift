@@ -140,7 +140,8 @@ final class TransportTests: XCTestCase {
         "/support-api/v1/conversations/7/messages", "/support-api/v1/anonymous-conversations/claim",
       ])
     XCTAssertEqual(
-      stub.requests.map(\.httpMethod), ["GET", "GET", "POST", "GET", "POST", "GET", "GET", "POST", "POST"])
+      stub.requests.map(\.httpMethod),
+      ["GET", "GET", "POST", "GET", "POST", "GET", "GET", "POST", "POST"])
     for request in stub.requests {
       XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer synthetic-token")
       XCTAssertEqual(request.value(forHTTPHeaderField: "Cache-Control"), "no-cache, no-store")

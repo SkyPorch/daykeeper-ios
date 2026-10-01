@@ -462,7 +462,8 @@ final class SessionTests: XCTestCase {
 
     await active.loadOlderMessages()
     XCTAssertEqual(active.messages.map(\.id), Array(1...45).map(Int64.init))
-    XCTAssertTrue(active.hasOlderMessages, "A non-empty short page may still be filtered defensively")
+    XCTAssertTrue(
+      active.hasOlderMessages, "A non-empty short page may still be filtered defensively")
 
     await active.loadOlderMessages()
     XCTAssertFalse(active.hasOlderMessages, "Only an empty older page proves history is exhausted")

@@ -233,7 +233,8 @@ public struct DaykeeperMessenger: View {
           .disabled(!session.canEditDraft)
           .accessibilityLabel(daykeeperText("daykeeper.composer"))
           .accessibilityHint(
-            session.isDraftTooLong ? daykeeperText("daykeeper.composer.limit_hint") : "")
+            session.isDraftTooLong ? daykeeperText("daykeeper.composer.limit_hint") : ""
+          )
           .accessibilityIdentifier("daykeeper.message")
         Button(daykeeperText("daykeeper.send")) {
           isEditing = false

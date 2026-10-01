@@ -124,8 +124,11 @@ extension DaykeeperClient: CustomerAPI {}
       self.selectedConversationID = id
       self.replaceMessages(result.messages)
       self.hasOlderMessages = !result.messages.isEmpty
-      if let fetched = result.messages.last?.id { self.fetchedThrough[id] = fetched }
-      else { self.fetchedThrough[id] = nil }
+      if let fetched = result.messages.last?.id {
+        self.fetchedThrough[id] = fetched
+      } else {
+        self.fetchedThrough[id] = nil
+      }
       self.draft = self.drafts[id] ?? ""
       if self.uncertainThreads.contains(id) { self.reviewedUncertainThreads.insert(id) }
     }
