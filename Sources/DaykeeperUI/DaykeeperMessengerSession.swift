@@ -6,7 +6,9 @@ internal protocol CustomerAPI: Sendable {
   func getIdentityWithFreshToken() async throws -> DaykeeperCustomerIdentity
   func listConversations() async throws -> DaykeeperConversationList
   func createConversation() async throws -> DaykeeperConversationResult
-  func listMessages(in conversationID: Int64, after: Int64?) async throws -> DaykeeperMessageList
+  func listMessages(
+    in conversationID: Int64, after: Int64?, before: Int64?
+  ) async throws -> DaykeeperMessageList
   func sendMessage(in conversationID: Int64, content: String) async throws -> DaykeeperMessageResult
   func markConversationSeen(_ conversationID: Int64) async throws -> DaykeeperSeenResult
 }
@@ -17,6 +19,7 @@ extension DaykeeperClient: CustomerAPI {}
 @MainActor public final class DaykeeperMessengerSession: ObservableObject {
   @Published public private(set) var conversations: [DaykeeperConversation] = []
   @Published public private(set) var messages: [DaykeeperMessage] = []
+  @Published public private(set) var hasOlderMessages = false
   @Published public private(set) var selectedConversationID: Int64?
   @Published public private(set) var isBusy = false
   @Published public private(set) var isSuspended = false
@@ -32,6 +35,9 @@ extension DaykeeperClient: CustomerAPI {}
   private var revision = 0
   private var cancelCurrent: (() -> Void)?
   private var drafts: [Int64: String] = [:]
+  /// Last message fetched from the gateway, kept separate from messages sent by this client so a
+  /// successful send cannot skip still-unfetched pages in a busy conversation.
+  private var fetchedThrough: [Int64: Int64] = [:]
   private var suspendedSelection: Int64?
   private enum WriteConcern {
     case creation
@@ -57,8 +63,10 @@ extension DaykeeperClient: CustomerAPI {}
 
   public var canSend: Bool {
     canEditDraft && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      && draft.utf16.count <= 16_000
+      && !isDraftTooLong
   }
+
+  public var isDraftTooLong: Bool { draft.utf16.count > 16_000 }
 
   public var canDiscardUncertainDraft: Bool {
     guard !isBusy, !isSuspended, !isSignedOut, let id = selectedConversationID else { return false }
@@ -75,19 +83,27 @@ extension DaykeeperClient: CustomerAPI {}
     let selected = selectedConversationID
     if let selected { reviewedUncertainThreads.remove(selected) }
     creationReviewed = false
-    // Ask only for what is new. Re-reading a long thread in full can exceed the
-    // transport's response ceiling and make the whole conversation unreadable.
-    let cursor = selected == nil ? nil : messages.last?.id
+    // The initial request loads the latest visible page; subsequent refreshes
+    // ask only for messages newer than the last one fetched from the server.
+    let cursor = selected.flatMap { fetchedThrough[$0] }
     await perform { api in
       let list = try await api.listConversations()
       let messages = try await selected.mapAsync {
-        try await api.listMessages(in: $0, after: cursor).messages
+        try await api.listMessages(in: $0, after: cursor, before: nil).messages
       }
       return (list.conversations, messages)
     } success: { result in
       self.conversations = result.0
       if let messages = result.1 {
-        if cursor == nil { self.replaceMessages(messages) } else { self.mergeMessages(messages) }
+        if cursor == nil {
+          self.replaceMessages(messages)
+          self.hasOlderMessages = !messages.isEmpty
+        } else {
+          self.mergeMessages(messages)
+        }
+        if let selected, let fetched = messages.last?.id {
+          self.fetchedThrough[selected] = max(self.fetchedThrough[selected] ?? 0, fetched)
+        }
       }
       if let selected, self.uncertainThreads.contains(selected) {
         self.reviewedUncertainThreads.insert(selected)
@@ -103,12 +119,33 @@ extension DaykeeperClient: CustomerAPI {}
     saveDraft()
     reviewedUncertainThreads.remove(id)
     await perform {
-      try await $0.listMessages(in: id, after: nil)
+      try await $0.listMessages(in: id, after: nil, before: nil)
     } success: { result in
       self.selectedConversationID = id
       self.replaceMessages(result.messages)
+      self.hasOlderMessages = !result.messages.isEmpty
+      if let fetched = result.messages.last?.id { self.fetchedThrough[id] = fetched }
+      else { self.fetchedThrough[id] = nil }
       self.draft = self.drafts[id] ?? ""
       if self.uncertainThreads.contains(id) { self.reviewedUncertainThreads.insert(id) }
+    }
+  }
+
+  /// Load the previous visible-message window. The button remains available
+  /// after a non-empty page; only an empty page proves there is no older history.
+  public func loadOlderMessages() async {
+    guard hasOlderMessages, !isBusy, !isSuspended, !isSignedOut,
+      let id = selectedConversationID, let before = messages.first?.id
+    else { return }
+    await perform { api in
+      try await api.listMessages(in: id, after: nil, before: before)
+    } success: { result in
+      if result.messages.isEmpty {
+        self.hasOlderMessages = false
+      } else {
+        self.mergeMessages(result.messages)
+        self.hasOlderMessages = true
+      }
     }
   }
 
@@ -117,6 +154,7 @@ extension DaykeeperClient: CustomerAPI {}
     saveDraft()
     selectedConversationID = nil
     replaceMessages([])
+    hasOlderMessages = false
     draft = ""
     error = nil
   }
@@ -130,6 +168,8 @@ extension DaykeeperClient: CustomerAPI {}
         self.conversations.insert(result.conversation, at: 0)
         self.selectedConversationID = result.conversation.id
         self.replaceMessages([])
+        self.hasOlderMessages = false
+        self.fetchedThrough[result.conversation.id] = nil
         self.draft = ""
       })
   }
@@ -190,6 +230,8 @@ extension DaykeeperClient: CustomerAPI {}
     conversations = []
     replaceMessages([])
     selectedConversationID = nil
+    hasOlderMessages = false
+    fetchedThrough = [:]
     draft = ""
     error = nil
   }
@@ -210,6 +252,8 @@ extension DaykeeperClient: CustomerAPI {}
     client = nil
     conversations = []
     replaceMessages([])
+    hasOlderMessages = false
+    fetchedThrough = [:]
     selectedConversationID = nil
     draft = ""
     drafts = [:]

@@ -14,14 +14,15 @@ private actor CustomerFixture: CustomerAPI {
   private(set) var creates = 0
   private(set) var identityReads = 0
   private(set) var cursors: [Int64?] = []
+  private(set) var beforeCursors: [Int64?] = []
   private var identityRejected = false
   private var identityUnavailable = false
   /// Return write results straight away instead of parking on a continuation.
   private var autoCompleteWrites = false
+  private var sendResultID: Int64 = 9
   private var identitySubject = "synthetic"
   private var writeAuthStatus: Int?
   private var history: [Int64] = []
-  private var baseListTooLarge = false
   private var rejected = false
   private var seen = false
   private let unreadAfterSeen: Int
@@ -58,10 +59,9 @@ private actor CustomerFixture: CustomerAPI {
   /// Make the recovery read fail for a reason that says nothing about the token.
   func makeIdentityUnavailable() { identityUnavailable = true }
   func completeWritesImmediately() { autoCompleteWrites = true }
+  func useSendResultID(_ id: Int64) { sendResultID = id }
   /// Seed the thread the gateway will serve for an uncursored read.
   func seedHistory(_ ids: [Int64]) { history = ids }
-  /// Simulate a thread whose full body no longer fits the transport ceiling.
-  func failUncursoredHistory() { baseListTooLarge = true }
   func getIdentityWithFreshToken() async throws -> DaykeeperCustomerIdentity {
     identityReads += 1
     if identityUnavailable { throw try failure() }
@@ -77,9 +77,6 @@ private actor CustomerFixture: CustomerAPI {
       "{\"code\":\"expired_token\",\"status\":\(status),\"retryable\":false,\"outcomeUnknown\":false}"
     )
   }
-  private func tooLarge() throws -> DaykeeperError {
-    try decode(#"{"code":"RESPONSE_TOO_LARGE","retryable":false,"outcomeUnknown":false}"#)
-  }
   private static func messageJSON(_ id: Int64) -> String {
     """
     {"id":\(id),"conversationId":7,"content":"Message \(id)","contentType":"text",    "contentAttributes":{},"messageType":1,"createdAt":123,"sender":null,"attachments":[]}
@@ -94,11 +91,20 @@ private actor CustomerFixture: CustomerAPI {
       #"{"code":"support_upstream_unavailable","status":503,"retryable":false,"outcomeUnknown":true}"#
     )
   }
-  func listMessages(in conversationID: Int64, after: Int64?) async throws -> DaykeeperMessageList {
+  func listMessages(
+    in conversationID: Int64, after: Int64?, before: Int64?
+  ) async throws -> DaykeeperMessageList {
     cursors.append(after)
+    beforeCursors.append(before)
     if historyFailure { throw try failure() }
-    if after == nil && baseListTooLarge { throw try tooLarge() }
-    let visible = history.filter { id in after.map { id > $0 } ?? true }
+    let visible: [Int64]
+    if let before {
+      visible = Array(history.filter { $0 < before }.suffix(20))
+    } else if let after {
+      visible = Array(history.filter { $0 > after }.prefix(20))
+    } else {
+      visible = Array(history.suffix(20))
+    }
     return try decode("{\"messages\":[\(visible.map(Self.messageJSON).joined(separator: ","))]}")
   }
   func createConversation() async throws -> DaykeeperConversationResult {
@@ -112,7 +118,10 @@ private actor CustomerFixture: CustomerAPI {
     sends += 1
     if let writeAuthStatus { throw try authFailure(writeAuthStatus) }
     if uncertainWrites { throw try failure() }
-    if autoCompleteWrites { return try decode("{\"message\":\(Self.messageJSON)}") }
+    if autoCompleteWrites {
+      if !history.contains(sendResultID) { history.append(sendResultID) }
+      return try decode("{\"message\":\(Self.messageJSON(sendResultID))}")
+    }
     return await withCheckedContinuation { sendContinuation = $0 }
   }
   func markConversationSeen(_ conversationID: Int64) async throws -> DaykeeperSeenResult {
@@ -163,6 +172,24 @@ final class SessionTests: XCTestCase {
     let sends = await api.sends
     XCTAssertEqual(sends, 1)
     active.reset()
+  }
+
+  @MainActor func testOverlongDraftIsPreservedAndExplainsWhyItCannotBeSent() async throws {
+    let api = CustomerFixture()
+    await api.seedHistory([1])
+    let active = DaykeeperMessengerSession(customerAPI: api)
+    await active.refresh()
+    await active.selectConversation(7)
+    let overlongDraft = String(repeating: "🙂", count: 8_001)
+    active.draft = overlongDraft
+
+    XCTAssertTrue(active.isDraftTooLong)
+    XCTAssertFalse(active.canSend)
+    XCTAssertEqual(active.draft, overlongDraft, "The user's text must stay editable and intact")
+
+    active.draft = String(repeating: "a", count: 16_000)
+    XCTAssertFalse(active.isDraftTooLong)
+    XCTAssertTrue(active.canSend)
   }
 
   @MainActor func testUncertainCreationRequiresFreshListAndDoesNotRepeatWrite() async throws {
@@ -420,22 +447,60 @@ final class SessionTests: XCTestCase {
     XCTAssertEqual(sends, 1)
   }
 
-  @MainActor func testRefreshPagesFromTheLastMessageSoAnOversizedThreadStaysReadable() async throws
-  {
+  @MainActor func testInitialHistoryLoadsLatestWindowAndPagesOlderUntilEmpty() async throws {
     let api = CustomerFixture()
-    await api.seedHistory([1, 2])
+    await api.seedHistory(Array(1...45).map(Int64.init))
     let active = DaykeeperMessengerSession(customerAPI: api)
     await active.refresh()
     await active.selectConversation(7)
-    XCTAssertEqual(active.messages.map(\.id), [1, 2])
-    // The thread has grown past the transport ceiling: an uncursored read of the
-    // whole conversation would now fail outright.
-    await api.failUncursoredHistory()
-    await api.seedHistory([1, 2, 3])
+    XCTAssertEqual(active.messages.map(\.id), Array(26...45).map(Int64.init))
+    XCTAssertTrue(active.hasOlderMessages)
+
+    await active.loadOlderMessages()
+    XCTAssertEqual(active.messages.map(\.id), Array(6...45).map(Int64.init))
+    XCTAssertTrue(active.hasOlderMessages)
+
+    await active.loadOlderMessages()
+    XCTAssertEqual(active.messages.map(\.id), Array(1...45).map(Int64.init))
+    XCTAssertTrue(active.hasOlderMessages, "A non-empty short page may still be filtered defensively")
+
+    await active.loadOlderMessages()
+    XCTAssertFalse(active.hasOlderMessages, "Only an empty older page proves history is exhausted")
+    XCTAssertEqual(active.messages.map(\.id), Array(1...45).map(Int64.init))
+
     await active.refresh()
-    XCTAssertNil(active.error, "A cursored refresh must not hit the response ceiling")
-    XCTAssertEqual(active.messages.map(\.id), [1, 2, 3])
+    await api.seedHistory(Array(1...46).map(Int64.init))
+    await active.refresh()
+    XCTAssertNil(active.error)
+    XCTAssertEqual(active.messages.map(\.id), Array(1...46).map(Int64.init))
     let cursors = await api.cursors
-    XCTAssertEqual(cursors, [nil, 2], "Refresh asks only for messages after the last one held")
+    XCTAssertEqual(cursors, [nil, nil, nil, nil, 45, 45])
+    let beforeCursors = await api.beforeCursors
+    XCTAssertEqual(beforeCursors, [nil, 26, 6, 1, nil, nil])
   }
+
+  @MainActor func testSendResultCannotLeapfrogAnUnreadAfterPage() async throws {
+    let api = CustomerFixture()
+    await api.seedHistory(Array(1...50).map(Int64.init))
+    let active = DaykeeperMessengerSession(customerAPI: api)
+    await active.refresh()
+    await active.selectConversation(7)
+    XCTAssertEqual(active.messages.map(\.id), Array(31...50).map(Int64.init))
+
+    await api.seedHistory(Array(1...80).map(Int64.init))
+    await active.refresh()
+    XCTAssertEqual(active.messages.map(\.id), Array(31...70).map(Int64.init))
+
+    await api.useSendResultID(81)
+    await api.completeWritesImmediately()
+    active.draft = "A new message"
+    await active.sendMessage()
+    XCTAssertEqual(active.messages.last?.id, 81)
+
+    await active.refresh()
+    XCTAssertEqual(active.messages.map(\.id), Array(31...81).map(Int64.init))
+    let cursors = await api.cursors
+    XCTAssertEqual(Array(cursors.suffix(2)), [50, 70])
+  }
+
 }
