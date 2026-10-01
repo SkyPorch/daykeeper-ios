@@ -1,5 +1,7 @@
 # Daykeeper for iOS
 
+Learn more about Daykeeper at [mydaykeeper.com](https://www.mydaykeeper.com).
+
 Native customer support for iOS, maintained by SkyPorch. Two Swift Package Manager
 products, no third-party runtime dependencies:
 
