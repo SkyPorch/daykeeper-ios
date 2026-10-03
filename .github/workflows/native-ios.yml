@@ -1,0 +1,108 @@
+name: Native iOS
+
+on:
+  # The base-branch workflow defines runner eligibility before candidate checkout.
+  pull_request_target:
+    paths-ignore: ["**/*.md", "docs/**"]
+  push:
+    branches: [main]
+    paths-ignore: ["**/*.md", "docs/**"]
+  workflow_dispatch:
+    inputs:
+      simulate-offline:
+        description: Verify the passing skip without native execution
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  availability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      available: ${{ steps.check.outputs.available }}
+    steps:
+      - id: check
+        name: Check eligible native capacity
+        env:
+          HEARTBEAT: ${{ vars.NATIVE_IOS_HEARTBEAT }}
+          DISABLED: ${{ inputs.simulate-offline || vars.NATIVE_IOS_DISABLED == 'true' }}
+          TRUSTED: ${{ github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository }}
+        shell: python3 {0}
+        run: |
+          import json, os, time
+          available = False
+          reason = 'Native checks skipped: capacity is offline or unavailable.'
+          try:
+              heartbeat = json.loads(os.environ['HEARTBEAT'])
+              timestamp = heartbeat['checked_at']
+              available = (heartbeat.get('ready') is True and type(timestamp) is int
+                           and 0 <= time.time() - timestamp < 180)
+          except (ValueError, KeyError, TypeError, AttributeError):
+              pass
+          if os.environ['DISABLED'] == 'true':
+              available = False
+          if os.environ['TRUSTED'] != 'true':
+              available = False
+              reason = 'Native checks skipped: source must be a trusted repository branch.'
+          if available:
+              reason = 'Native capacity is available.'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'available={str(available).lower()}\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
+              output.write(reason + '\n')
+          print(reason)
+
+  ios-package:
+    needs: availability
+    if: needs.availability.outputs.available == 'true'
+    runs-on: [self-hosted, macOS, ARM64, native-ios]
+    timeout-minutes: 150
+    concurrency:
+      group: native-ios-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22.22.0
+      - name: Validate native package within shared capacity
+        env:
+          NATIVE_CI_LAUNCHER: ${{ vars.NATIVE_CI_LAUNCHER }}
+        run: python3 "$NATIVE_CI_LAUNCHER" --timeout 2700 -- bash Scripts/ci-native.sh
+      - name: Native test evidence
+        if: always() && github.event_name != 'pull_request_target'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-ios-test-results
+          path: TestResults/
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Remove local test evidence
+        if: always()
+        run: rm -rf TestResults
+
+  native-result:
+    name: Native iOS result
+    if: always()
+    needs: [availability, ios-package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Report native validation or passing offline skip
+        env:
+          AVAILABILITY: ${{ needs.availability.result }}
+          AVAILABLE: ${{ needs.availability.outputs.available }}
+          NATIVE_RESULT: ${{ needs.ios-package.result }}
+        run: |
+          [[ "$AVAILABILITY" == success ]] || exit 1
+          if [[ "$AVAILABLE" != true ]]; then
+            echo 'Native checks skipped: eligible capacity was unavailable.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            [[ "$NATIVE_RESULT" == success ]] || exit 1
+          fi
