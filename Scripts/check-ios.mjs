@@ -30,7 +30,7 @@ await withFixture(async origin => {
   try {
     await run("xcrun", ["simctl", "boot", device], { timeout: 120_000 });
     await run("xcrun", ["simctl", "bootstatus", device, "-b"], { timeout: 600_000 });
-    await run("xcodebuild", ["test", "-project",
+    await run("xcodebuild", ["test", "-jobs", "2", "-project",
       "Examples/DaykeeperExample/DaykeeperExample.xcodeproj", "-scheme", "DaykeeperExample",
       "-destination", `platform=iOS Simulator,id=${device}`, "-parallel-testing-enabled", "NO",
       "-maximum-concurrent-test-simulator-destinations", "1", "-derivedDataPath", "DerivedData/Example",
