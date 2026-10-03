@@ -65,12 +65,19 @@ jobs:
     if: needs.availability.outputs.available == 'true'
     runs-on: [self-hosted, macOS, ARM64, native-ios]
     timeout-minutes: 150
-    env:
-      NATIVE_CI_PRIVATE_IDENTIFIERS: ${{ secrets.NATIVE_CI_PRIVATE_IDENTIFIERS }}
     concurrency:
       group: native-ios-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: true
     steps:
+      - name: Mask private runner identifiers
+        env:
+          PRIVATE_IDENTIFIERS: ${{ secrets.NATIVE_CI_PRIVATE_IDENTIFIERS }}
+        shell: python3 {0}
+        run: |
+          import os
+          for value in os.environ.pop('PRIVATE_IDENTIFIERS').splitlines():
+              if value:
+                  print('::add-mask::' + value)
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
