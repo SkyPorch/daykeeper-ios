@@ -3,6 +3,7 @@ name: Native iOS
 on:
   # The base-branch workflow defines runner eligibility before candidate checkout.
   pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths-ignore: ["**/*.md", "docs/**"]
   push:
     branches: [main]
@@ -29,6 +30,7 @@ jobs:
         env:
           HEARTBEAT: ${{ vars.NATIVE_IOS_HEARTBEAT }}
           DISABLED: ${{ inputs.simulate-offline || vars.NATIVE_IOS_DISABLED == 'true' }}
+          DRAFT: ${{ github.event.pull_request.draft || false }}
           TRUSTED: ${{ github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository }}
         shell: python3 {0}
         run: |
@@ -47,6 +49,9 @@ jobs:
           if os.environ['TRUSTED'] != 'true':
               available = False
               reason = 'Native checks skipped: source must be a trusted repository branch.'
+          if os.environ['DRAFT'] == 'true':
+              available = False
+              reason = 'Native checks skipped: pull request is a draft.'
           if available:
               reason = 'Native capacity is available.'
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
