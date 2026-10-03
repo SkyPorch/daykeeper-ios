@@ -65,6 +65,8 @@ jobs:
     if: needs.availability.outputs.available == 'true'
     runs-on: [self-hosted, macOS, ARM64, native-ios]
     timeout-minutes: 150
+    env:
+      NATIVE_CI_PRIVATE_IDENTIFIERS: ${{ secrets.NATIVE_CI_PRIVATE_IDENTIFIERS }}
     concurrency:
       group: native-ios-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: true
