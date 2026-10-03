@@ -114,7 +114,8 @@ final class TransportTests: XCTestCase {
       .json(
         200, ["unreadCount": 2, "conversation": conversation, "conversations": [conversation]]),
       .json(200, ["conversationId": 7, "seen": true, "seenAt": 123]),
-      .json(200, ["messages": [message]]),
+      .json(200, ["pagination": "cursor", "messages": [message]]),
+      .json(200, ["pagination": "cursor", "messages": [message]]),
       .json(201, ["message": message]), .json(200, ["status": "merged", "conversations": 1]),
     ])
     let client = try stub.client()
@@ -125,6 +126,7 @@ final class TransportTests: XCTestCase {
     _ = try await client.getUnread()
     _ = try await client.markConversationSeen(7)
     _ = try await client.listMessages(in: 7, after: 3)
+    _ = try await client.listMessages(in: 7, before: 10)
     _ = try await client.sendMessage(in: 7, content: " Hello ")
     _ = try await client.claimAnonymousConversation(widgetToken: " anonymous ")
     XCTAssertEqual(
@@ -134,11 +136,15 @@ final class TransportTests: XCTestCase {
       [
         "/support-api/v1/identity", "/support-api/v1/conversations",
         "/support-api/v1/conversations", "/support-api/v1/unread",
-        "/support-api/v1/conversations/7/seen", "/support-api/v1/conversations/7/messages?after=3",
-        "/support-api/v1/conversations/7/messages", "/support-api/v1/anonymous-conversations/claim",
+        "/support-api/v1/conversations/7/seen",
+        "/support-api/v1/conversations/7/messages?pagination=cursor&after=3",
+        "/support-api/v1/conversations/7/messages?pagination=cursor&before=10",
+        "/support-api/v1/conversations/7/messages",
+        "/support-api/v1/anonymous-conversations/claim",
       ])
     XCTAssertEqual(
-      stub.requests.map(\.httpMethod), ["GET", "GET", "POST", "GET", "POST", "GET", "POST", "POST"])
+      stub.requests.map(\.httpMethod),
+      ["GET", "GET", "POST", "GET", "POST", "GET", "GET", "POST", "POST"])
     for request in stub.requests {
       XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer synthetic-token")
       XCTAssertEqual(request.value(forHTTPHeaderField: "Cache-Control"), "no-cache, no-store")
@@ -253,6 +259,12 @@ final class TransportTests: XCTestCase {
         XCTFail("Expected invalid ID")
       } catch let error as DaykeeperError { XCTAssertEqual(error.code, "INVALID_CONFIGURATION") }
     }
+    for cursor in [Int64(0), -1] {
+      do {
+        _ = try await client.listMessages(in: 7, after: cursor)
+        XCTFail("Cursor values must be positive")
+      } catch let error as DaykeeperError { XCTAssertEqual(error.code, "INVALID_CONFIGURATION") }
+    }
     for content in [" \n", String(repeating: "😀", count: 8001)] {
       do {
         _ = try await client.sendMessage(in: 7, content: content)
@@ -267,6 +279,38 @@ final class TransportTests: XCTestCase {
       } catch let error as DaykeeperError { XCTAssertEqual(error.code, "INVALID_CONFIGURATION") }
     }
     XCTAssertTrue(stub.requests.isEmpty)
+  }
+
+  func testMessagePagesMustAdvancePastTheirCursor() async throws {
+    let stub = Stub([
+      .json(200, ["pagination": "cursor", "messages": [message]]),
+      .json(200, ["pagination": "cursor", "messages": [message]]),
+    ])
+    let client = try stub.client()
+    do {
+      _ = try await client.listMessages(in: 7, after: 10)
+      XCTFail("An after page cannot repeat an earlier message")
+    } catch let error as DaykeeperError {
+      XCTAssertEqual(error.code, "INVALID_RESPONSE")
+    }
+    do {
+      _ = try await client.listMessages(in: 7, before: 4)
+      XCTFail("A before page cannot repeat a later message")
+    } catch let error as DaykeeperError {
+      XCTAssertEqual(error.code, "INVALID_RESPONSE")
+    }
+  }
+
+  func testCursorModeRejectsGatewayResponseWithoutCursorMarker() async throws {
+    let stub = Stub([.json(200, ["messages": [message]])])
+    let client = try stub.client()
+    do {
+      _ = try await client.listMessages(in: 7)
+      XCTFail("A legacy response must not be treated as cursor pagination")
+    } catch let error as DaykeeperError {
+      XCTAssertEqual(error.code, "INVALID_RESPONSE")
+    }
+    XCTAssertEqual(stub.requests.first?.url?.query, "pagination=cursor")
   }
 
   func testProviderFailureIsSanitizedAndNotDispatched() async throws {

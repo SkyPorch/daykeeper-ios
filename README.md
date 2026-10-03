@@ -108,7 +108,7 @@ host must apply any app-switcher privacy overlay required by its threat model.
 let list = try await client.listConversations()
 let unread = try await client.getUnread()
 // Use unread.unreadCount or conversation.unreadForContact for customer badges.
-let thread = try await client.listMessages(in: conversationID, after: nil)
+let initialPage = try await client.listMessages(in: conversationID) // latest 20
 let sent = try await client.sendMessage(in: conversationID, content: "Hello")
 ```
 
@@ -159,12 +159,16 @@ CocoaPods consumer building the package in Debug gets the local-fixture
 convenience; a Release build of the SDK refuses every unencrypted base URL, so
 it cannot be reached in a shipped app.
 
-Message history is read forward with the contract's `after` cursor. Refreshing
-an open thread asks only for messages newer than the last one held, so a long
-conversation is not re-read in full each time. The customer contract has no
-backward cursor or page-size parameter, so the client cannot request an older
-window; a thread whose first page already exceeds the 1 MiB response cap needs a
-gateway-side page parameter before it can be opened.
+Message reads opt into the gateway's marked cursor profile. A gateway that
+ignores the opt-in and returns the legacy envelope is rejected as an invalid
+response; deploy a compatible gateway before enabling this candidate.
+Opening a conversation loads the latest 20 customer-visible messages. Use the
+Load older messages control to page backward; it stays available after a short
+non-empty page and disappears only after an empty page. Refreshing an open
+thread asks for the next page after the last server-fetched message. Refresh can
+be repeated to catch up through multiple pages; local send results never advance
+that history cursor. The composer keeps an over-limit draft intact and explains that messages may contain at most
+16,000 UTF-16 code units before Send is enabled again.
 
 ## Privacy and licensing
 

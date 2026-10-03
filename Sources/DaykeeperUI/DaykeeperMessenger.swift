@@ -171,6 +171,18 @@ public struct DaykeeperMessenger: View {
       ScrollViewReader { proxy in
         ScrollView {
           LazyVStack(alignment: .leading, spacing: 16) {
+            if session.hasOlderMessages {
+              Button(daykeeperText("daykeeper.load_older")) {
+                let visibleAnchor = session.messages.first?.id
+                Task {
+                  await session.loadOlderMessages()
+                  await Task.yield()
+                  if let visibleAnchor { proxy.scrollTo(visibleAnchor, anchor: .top) }
+                }
+              }
+              .disabled(session.isBusy || session.isSuspended || session.isSignedOut)
+              .accessibilityIdentifier("daykeeper.load-older")
+            }
             ForEach(session.messages) { item in
               VStack(alignment: .leading, spacing: 6) {
                 Text(
@@ -208,21 +220,32 @@ public struct DaykeeperMessenger: View {
             .disabled(!session.canDiscardUncertainDraft)
         }.padding()
       }
+      if session.isDraftTooLong {
+        Text(daykeeperText("daykeeper.composer.limit_error"))
+          .font(.callout).foregroundStyle(.red)
+          .accessibilityIdentifier("daykeeper.message.limit-error")
+          .padding(.horizontal)
+      }
       HStack(alignment: .bottom) {
         TextEditor(text: $session.draft)
           .focused($isEditing)
           .frame(minHeight: 48, maxHeight: 120).border(Color.secondary.opacity(0.3))
           .disabled(!session.canEditDraft)
           .accessibilityLabel(daykeeperText("daykeeper.composer"))
+          .accessibilityHint(
+            session.isDraftTooLong ? daykeeperText("daykeeper.composer.limit_hint") : ""
+          )
           .accessibilityIdentifier("daykeeper.message")
         Button(daykeeperText("daykeeper.send")) {
           isEditing = false
           Task { await session.sendMessage() }
         }
         .disabled(!session.canSend).accessibilityIdentifier("daykeeper.send")
+        .accessibilityHint(
+          session.isDraftTooLong ? daykeeperText("daykeeper.composer.limit_hint") : "")
       }.padding()
       Button(daykeeperText("daykeeper.mark_read")) { Task { await session.markRead() } }
-        .disabled(session.isBusy).padding(.bottom)
+        .disabled(!session.canMarkRead).padding(.bottom)
         .accessibilityIdentifier("daykeeper.mark-read")
     }
   }

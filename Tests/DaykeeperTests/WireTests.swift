@@ -79,6 +79,16 @@ final class WireTests: XCTestCase {
     XCTAssertEqual(full.messages.count, 2)
   }
 
+  func testBeforeCursorFetchesThePreviousVisibleWindow() async throws {
+    let (url, _) = try caseURL("pages")
+    let client = try DaykeeperClient(baseURL: url) { _ in "fixture-a" }
+    let latest = try await client.listMessages(in: 7)
+    XCTAssertEqual(latest.messages.map(\.id), Array(6...25).map(Int64.init))
+
+    let older = try await client.listMessages(in: 7, before: 6)
+    XCTAssertEqual(older.messages.map(\.id), Array(1...5).map(Int64.init))
+  }
+
   func testRedirectTargetsAreNeverReachedIncluding307And308() async throws {
     for status in [301, 302, 303, 307, 308] {
       let (url, key) = try caseURL("redirect\(status)")

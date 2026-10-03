@@ -78,14 +78,27 @@ public final class DaykeeperClient: @unchecked Sendable {
       else { throw DaykeeperError("INVALID_RESPONSE") }
     }
   }
-  public func listMessages(in conversationID: Int64, after: Int64? = nil) async throws
+  public func listMessages(
+    in conversationID: Int64, after: Int64? = nil, before: Int64? = nil
+  ) async throws
     -> DaykeeperMessageList
   {
     try Self.positive(conversationID)
+    guard after == nil || before == nil else { throw DaykeeperError("INVALID_CONFIGURATION") }
     if let after { try Self.positive(after) }
-    let query = after.map { "?after=\($0)" } ?? ""
+    if let before { try Self.positive(before) }
+    var queryItems = ["pagination=cursor"]
+    if let after { queryItems.append("after=\(after)") }
+    if let before { queryItems.append("before=\(before)") }
+    let query = "?" + queryItems.joined(separator: "&")
     return try await request("/v1/conversations/\(conversationID)/messages\(query)") {
+      guard $0.pagination == "cursor" else { throw DaykeeperError("INVALID_RESPONSE") }
       try Self.validate($0.messages, conversationID: conversationID)
+      let ids = $0.messages.map(\.id)
+      guard ids == ids.sorted(),
+        ids.allSatisfy({ id in (after.map { id > $0 } ?? true) && (before.map { id < $0 } ?? true) }
+        )
+      else { throw DaykeeperError("INVALID_RESPONSE") }
     }
   }
   public func sendMessage(in conversationID: Int64, content: String) async throws
