@@ -37,6 +37,12 @@
 
 /* Composer accessibility label. */
 "daykeeper.composer" = "Message";
+/* Warning shown when a message draft exceeds the API length limit. The draft remains editable. */
+"daykeeper.composer.limit_error" = "This message exceeds the 16,000-character limit. Some symbols count as two. Shorten it before sending.";
+/* Accessibility hint for an overlong message draft. */
+"daykeeper.composer.limit_hint" = "Shorten the message to 16,000 UTF-16 units or fewer before sending. Some symbols count as two.";
+/* Button at the start of a conversation to fetch an older page of messages. */
+"daykeeper.load_older" = "Load older messages";
 /* Button that sends the composed message. */
 "daykeeper.send" = "Send";
 /* Button that marks the open conversation as read. */

@@ -70,12 +70,25 @@ const server = createServer(async (request, response) => {
   }
   if (path === "/v1/conversations/7/messages") {
     const historyKey = `${key}-${customer}`;
-    const history = histories.get(historyKey) ?? (key.startsWith("new") ? [] : [message(`Hello from support for customer ${customer}`)]); histories.set(historyKey,history);
+    const initialHistory = key.startsWith("pages")
+      ? Array.from({ length: 25 }, (_, index) => message(`History ${index + 1}`, 1, index + 1))
+      : key.startsWith("new") ? [] : [message(`Hello from support for customer ${customer}`)];
+    const history = histories.get(historyKey) ?? initialHistory; histories.set(historyKey,history);
     if (request.method === "GET") {
+      if (url.searchParams.get("pagination") !== "cursor") return json(400,{error:"not_found"});
       const raw = url.searchParams.get("after");
+      const beforeRaw = url.searchParams.get("before");
       const after = raw === null ? null : Number(raw);
       if (after !== null && (!Number.isSafeInteger(after) || after < 1)) return json(400,{error:"not_found"});
-      return json(200,{messages: after === null ? history : history.filter(item => item.id > after)});
+      const before = beforeRaw === null ? null : Number(beforeRaw);
+      if (before !== null && (!Number.isSafeInteger(before) || before < 1)) return json(400,{error:"not_found"});
+      if (after !== null && before !== null) return json(400,{error:"not_found"});
+      const visible = after !== null
+        ? history.filter(item => item.id > after).slice(0, 20)
+        : before !== null
+          ? history.filter(item => item.id < before).slice(-20)
+          : history.slice(-20);
+      return json(200,{pagination:"cursor",messages: visible});
     }
     receipt.sends++;
     if(key.startsWith("quota"))return json(429,{error:"daykeeper_usage_limit_exceeded",retryable:false});

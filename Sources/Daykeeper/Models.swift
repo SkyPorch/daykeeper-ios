@@ -123,6 +123,13 @@ public struct DaykeeperSeenResult: Codable, Sendable, Equatable {
 }
 public struct DaykeeperMessageList: Codable, Sendable, Equatable {
   public let messages: [DaykeeperMessage]
+  /// Present when the server honored an explicit cursor-pagination request.
+  public let pagination: String?
+
+  public init(messages: [DaykeeperMessage], pagination: String? = nil) {
+    self.messages = messages
+    self.pagination = pagination
+  }
 }
 public struct DaykeeperMessageResult: Codable, Sendable, Equatable {
   public let message: DaykeeperMessage
