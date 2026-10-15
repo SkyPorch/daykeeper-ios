@@ -166,13 +166,40 @@ backward cursor or page-size parameter, so the client cannot request an older
 window; a thread whose first page already exceeds the 1 MiB response cap needs a
 gateway-side page parameter before it can be opened.
 
+## Device context
+
+Every request carries a `Daykeeper-Client` header that describes the device, so
+support agents see it on the customer's contact with no host code:
+
+- SDK name and version (`DaykeeperClient.sdkVersion`), platform, OS name and
+  version, and the hardware model identifier (for example `iPhone17,1`, not a
+  marketing name).
+- The app's display name, bundle identifier, version, and build.
+- The preferred language (for example `nl-NL`) and time zone identifier.
+
+It never includes `identifierForVendor`, the advertising identifier, the
+user-assigned device name, or location. Values are read once per process from
+Foundation and Darwin APIs, never block a request, and are omitted when empty or
+over-long. The header is base64url (no padding) of a UTF-8 JSON object.
+
+It is presentation context, not authorization: when your backend signs the same
+field (for example `appVersion`) into the customer token, the signed value wins.
+To send nothing beyond the token, opt out:
+
+```swift
+let client = try DaykeeperClient(
+  baseURL: gatewayURL, sendsDeviceContext: false, tokenProvider: customerToken)
+```
+
 ## Privacy and licensing
 
 There is no analytics, advertising, push registration, swizzling, remote asset
-loading, or persistent customer storage in this package. Support messages and
-customer tokens are transmitted to the configured gateway. The privacy manifest
-declares linked support content and customer identifiers, including name/email
-when supplied in customer tokens, for app functionality—not tracking. Review
+loading, or persistent customer storage in this package. Support messages,
+customer tokens, and the [device context](#device-context) are transmitted to
+the configured gateway. The privacy manifest declares linked support content,
+customer identifiers (including name/email when supplied in customer tokens),
+and device context as other diagnostic data, all for app functionality—not
+tracking. Review
 your backend's retention and data use, token contents, consent flows, and App
 Store disclosures for your actual integration. See
 [Apple's privacy guidance](https://developer.apple.com/app-store/app-privacy-details/).

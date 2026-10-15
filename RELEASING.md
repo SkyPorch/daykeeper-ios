@@ -41,6 +41,8 @@ pod merely to meet the deadline.
 
 1. Choose one exact SemVer version and update `CHANGELOG.md`, compatibility
    evidence, and the customer API contract snapshot in the same release PR.
+   Bump `DaykeeperClient.sdkVersion` together with `spec.version` in both
+   podspecs; a unit test fails when they differ.
 2. Run the full hosted package job from the exact release commit, including
    strict formatting, strict-concurrency tests, wire tests, the generic simulator
    build, both local CocoaPods source consumers, the independent SwiftPM consumer,

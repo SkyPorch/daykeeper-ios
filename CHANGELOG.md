@@ -42,4 +42,18 @@
   envelope through a closed three-value allowlist (`review_usage`,
   `review_setup`, `refresh_conversation`); anything else is dropped.
 
+### Added
+
+- Default device context: every request carries a `Daykeeper-Client` header
+  (base64url JSON) with the SDK version, OS, hardware model identifier, app
+  name/id/version/build, preferred language, and time zone, so agents see the
+  device on the contact with no host code. No vendor, advertising, or device-name
+  identifiers and no location. Values signed into the customer token win on the
+  gateway. Opt out with `DaykeeperClient(baseURL:sendsDeviceContext: false, ...)`.
+- `DaykeeperClient.sdkVersion`, kept equal to both podspecs' `spec.version` by a
+  test.
+- The privacy manifest declares the device context as linked
+  `NSPrivacyCollectedDataTypeOtherDiagnosticData` for app functionality, not
+  tracking.
+
 No published release yet. See [COMPATIBILITY.md](COMPATIBILITY.md) for exclusions.
