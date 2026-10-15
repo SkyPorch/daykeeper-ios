@@ -40,7 +40,7 @@ internal struct DaykeeperDeviceContext: Equatable, Sendable {
       ("sdk", sdk, 100), ("sdkVersion", sdkVersion, 100), ("platform", platform, 100),
       ("osName", osName, 100), ("osVersion", osVersion, 100),
       ("deviceBrand", deviceBrand, 100), ("deviceModel", deviceModel, 100),
-      ("appName", appName, 200), ("appId", appId, 100), ("appVersion", appVersion, 100),
+      ("appName", appName, 200), ("appId", appId, 200), ("appVersion", appVersion, 100),
       ("appBuild", appBuild, 100), ("locale", locale, 100), ("timeZone", timeZone, 100),
     ]
   }
@@ -91,6 +91,7 @@ internal struct DaykeeperDeviceContext: Equatable, Sendable {
     return DaykeeperDeviceContext(
       sdk: "ios",
       sdkVersion: DaykeeperClient.sdkVersion,
+      // "ios" even on Catalyst/iOS-on-Mac: gateway takes only ios|android|web; osName says macOS.
       platform: "ios",
       osName: operatingSystemName(model: model),
       osVersion: operatingSystemVersion(),
@@ -130,7 +131,7 @@ internal struct DaykeeperDeviceContext: Equatable, Sendable {
       return "macOS"
     #elseif os(iOS)
       if ProcessInfo.processInfo.isiOSAppOnMac { return "macOS" }
-      return model?.hasPrefix("iPad") == true ? "iPadOS" : "iOS"
+      return mobileSystemName(model: model)
     #elseif os(tvOS)
       return "tvOS"
     #elseif os(watchOS)
@@ -138,6 +139,11 @@ internal struct DaykeeperDeviceContext: Equatable, Sendable {
     #else
       return "unknown"
     #endif
+  }
+
+  /// iOS reports itself as iPadOS on iPad hardware. An unknown model is iOS.
+  static func mobileSystemName(model: String?) -> String {
+    model?.hasPrefix("iPad") == true ? "iPadOS" : "iOS"
   }
 
   static func operatingSystemVersion() -> String {
