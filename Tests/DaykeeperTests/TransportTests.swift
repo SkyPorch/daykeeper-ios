@@ -42,11 +42,13 @@ private final class Stub: @unchecked Sendable {
     return recorded
   }
   func client(
-    timeout: TimeInterval = 30, token: @escaping DaykeeperTokenProvider = { _ in "synthetic-token" }
+    timeout: TimeInterval = 30, sendsDeviceContext: Bool = true,
+    token: @escaping DaykeeperTokenProvider = { _ in "synthetic-token" }
   ) throws -> DaykeeperClient {
     try DaykeeperClient(
       baseURL: URL(string: "https://\(host)/support-api")!, timeout: timeout,
-      tokenProvider: token, protocolClasses: [StubProtocol.self])
+      sendsDeviceContext: sendsDeviceContext, tokenProvider: token,
+      protocolClasses: [StubProtocol.self])
   }
 }
 
@@ -145,6 +147,46 @@ final class TransportTests: XCTestCase {
       XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
       XCTAssertFalse(request.httpShouldHandleCookies)
       XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalAndRemoteCacheData)
+    }
+  }
+
+  func testEveryRequestDescribesTheDeviceUnlessTheHostOptsOut() async throws {
+    let expected = try XCTUnwrap(DaykeeperDeviceContext.header)
+    let stub = Stub([.json(401, ["error": "expired_token"]), .json(200, emptyList)])
+    _ = try await stub.client().listConversations()
+    let send = Stub([.json(201, ["message": message])])
+    _ = try await send.client().sendMessage(in: 7, content: "Hello")
+    let requests = stub.requests + send.requests
+    XCTAssertEqual(requests.count, 3)
+    for request in requests {
+      // The refreshed retry and the write carry it too, byte for byte.
+      XCTAssertEqual(request.value(forHTTPHeaderField: "Daykeeper-Client"), expected)
+    }
+    let header = try XCTUnwrap(requests.first?.value(forHTTPHeaderField: "Daykeeper-Client"))
+    XCTAssertNotNil(header.range(of: "^[A-Za-z0-9_-]+$", options: .regularExpression))
+    var base64 = header.replacingOccurrences(of: "-", with: "+")
+      .replacingOccurrences(of: "_", with: "/")
+    base64 += String(repeating: "=", count: (4 - base64.count % 4) % 4)
+    let decoded = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: XCTUnwrap(Data(base64Encoded: base64)))
+        as? [String: String])
+    XCTAssertEqual(decoded["sdk"], "ios")
+    XCTAssertEqual(decoded["platform"], "ios")
+    XCTAssertEqual(decoded["sdkVersion"], DaykeeperClient.sdkVersion)
+    XCTAssertEqual(decoded["deviceBrand"], "Apple")
+    XCTAssertEqual(decoded["timeZone"], TimeZone.current.identifier)
+    XCTAssertNotNil(decoded["osName"])
+    XCTAssertNotNil(decoded["osVersion"])
+    XCTAssertTrue(decoded.values.allSatisfy { !$0.isEmpty })
+
+    let optedOut = Stub([.json(200, emptyList), .json(201, ["conversation": conversation])])
+    let client = try optedOut.client(sendsDeviceContext: false)
+    _ = try await client.listConversations()
+    _ = try await client.createConversation()
+    XCTAssertEqual(optedOut.requests.count, 2)
+    for request in optedOut.requests {
+      XCTAssertNil(request.value(forHTTPHeaderField: "Daykeeper-Client"))
+      XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer synthetic-token")
     }
   }
 

@@ -9,22 +9,33 @@ public typealias DaykeeperTokenProvider = @Sendable (DaykeeperTokenRequest) asyn
 /// Customer APIs only. Supply short-lived customer tokens from your own backend,
 /// never a management credential. Cancel the task on logout/account changes.
 public final class DaykeeperClient: @unchecked Sendable {
+  /// This SDK's own version. It always equals `spec.version` in both podspecs,
+  /// and a test fails if a release bumps one without the other.
+  public static let sdkVersion = "0.1.0"
+
   private let baseURL: String
   private let tokenProvider: DaykeeperTokenProvider
   private let timeout: TimeInterval
+  private let sendsDeviceContext: Bool
   // Internal-only fixture hook; consumers cannot replace the security policy.
   private let protocolClasses: [AnyClass]?
 
+  /// - Parameter sendsDeviceContext: When true (the default) every request
+  ///   describes the device and app — OS, hardware model, app version, locale,
+  ///   time zone — so support agents see it on the contact. Pass false to send
+  ///   nothing beyond what the customer token itself carries.
   public convenience init(
-    baseURL: URL, timeout: TimeInterval = 30, tokenProvider: @escaping DaykeeperTokenProvider
+    baseURL: URL, timeout: TimeInterval = 30, sendsDeviceContext: Bool = true,
+    tokenProvider: @escaping DaykeeperTokenProvider
   ) throws {
     try self.init(
-      baseURL: baseURL, timeout: timeout, tokenProvider: tokenProvider, protocolClasses: nil)
+      baseURL: baseURL, timeout: timeout, sendsDeviceContext: sendsDeviceContext,
+      tokenProvider: tokenProvider, protocolClasses: nil)
   }
 
   internal init(
-    baseURL: URL, timeout: TimeInterval = 30, tokenProvider: @escaping DaykeeperTokenProvider,
-    protocolClasses: [AnyClass]?
+    baseURL: URL, timeout: TimeInterval = 30, sendsDeviceContext: Bool = true,
+    tokenProvider: @escaping DaykeeperTokenProvider, protocolClasses: [AnyClass]?
   ) throws {
     guard let components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false),
       let scheme = components.scheme, let host = components.host, !host.isEmpty,
@@ -38,6 +49,7 @@ public final class DaykeeperClient: @unchecked Sendable {
     self.baseURL = normalized
     self.timeout = timeout
     self.tokenProvider = tokenProvider
+    self.sendsDeviceContext = sendsDeviceContext
     self.protocolClasses = protocolClasses
   }
 
@@ -154,6 +166,9 @@ public final class DaykeeperClient: @unchecked Sendable {
           request.setValue("application/json", forHTTPHeaderField: "Accept")
           request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
           request.setValue("no-cache, no-store", forHTTPHeaderField: "Cache-Control")
+          if sendsDeviceContext, let context = DaykeeperDeviceContext.header {
+            request.setValue(context, forHTTPHeaderField: DaykeeperDeviceContext.headerName)
+          }
           if let body {
             request.httpBody = body
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
