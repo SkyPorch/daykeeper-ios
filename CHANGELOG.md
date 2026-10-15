@@ -2,6 +2,8 @@
 
 ## Unreleased — 0.1.0 candidate
 
+- Pin the customer API snapshot to the immutable OpenAPI `v1.11.0` release tag
+  (customer contract 0.2.0, which documents the `Daykeeper-Client` header).
 - Independent SwiftPM customer API and native SwiftUI messenger products.
 - Short-lived customer authentication, bounded isolated networking, safe errors,
   and explicit recovery for uncertain writes.
