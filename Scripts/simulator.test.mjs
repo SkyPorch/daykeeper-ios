@@ -14,12 +14,20 @@ const runtime = (version, devices, isAvailable = true) => ({
   supportedDeviceTypes: devices,
 });
 
-test("newest runtime uses its supported phone instead of an incompatible older model", () => {
+test("prefers a standard phone runtime over a newer Duo-only runtime", () => {
   const older = runtime("26.5", [phone("iPhone-16")]);
-  const newest = runtime("27.1", [phone("iPhone-Duo")]);
-  const selected = selectSimulator([older, newest]);
-  assert.equal(selected.runtime, newest);
-  assert.equal(selected.deviceType.identifier, phone("iPhone-Duo").identifier);
+  const normal = runtime("27.0", [phone("iPhone-16"), phone("iPhone-17")]);
+  const duo = runtime("27.1", [phone("iPhone-Duo")]);
+  const selected = selectSimulator([older, normal, duo]);
+  assert.equal(selected.runtime, normal);
+  assert.equal(selected.deviceType.identifier, phone("iPhone-17").identifier);
+});
+
+test("Duo-only capacity fails clearly instead of changing form factor", () => {
+  assert.throws(
+    () => selectSimulator([runtime("27.1", [phone("iPhone-Duo")])]),
+    /standard iPhone/,
+  );
 });
 
 test("unavailable, non-iOS, too-old and tablet-only runtimes cannot select an incompatible phone", () => {
@@ -32,9 +40,9 @@ test("unavailable, non-iOS, too-old and tablet-only runtimes cannot select an in
     valid,
   ]);
   assert.equal(selected.runtime, valid);
-  assert.equal(selected.deviceType.identifier, phone("iPhone-16").identifier);
+  assert.equal(selected.deviceType.identifier, phone("iPhone-17").identifier);
   assert.throws(
     () => selectSimulator([runtime("27.1", [])]),
-    /supported iPhone/,
+    /supported standard iPhone/,
   );
 });

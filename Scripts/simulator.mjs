@@ -1,3 +1,8 @@
+const standardPhones = [
+  "com.apple.CoreSimulator.SimDeviceType.iPhone-17",
+  "com.apple.CoreSimulator.SimDeviceType.iPhone-16",
+];
+
 export function selectSimulator(runtimes) {
   const candidates = runtimes
     .filter(
@@ -13,15 +18,14 @@ export function selectSimulator(runtimes) {
     const phones = (runtime.supportedDeviceTypes ?? []).filter(
       (device) => device.productFamily === "iPhone",
     );
-    const deviceType =
-      phones.find(
-        (device) =>
-          device.identifier ===
-          "com.apple.CoreSimulator.SimDeviceType.iPhone-16",
-      ) ?? phones[0];
+    const deviceType = standardPhones
+      .map((identifier) =>
+        phones.find((device) => device.identifier === identifier),
+      )
+      .find(Boolean);
     if (deviceType) return { runtime, deviceType };
   }
   throw new Error(
-    "Install an iOS 18+ Simulator runtime with a supported iPhone device type",
+    "Install an iOS 18+ Simulator runtime with a supported standard iPhone 17 or iPhone 16 device type",
   );
 }
