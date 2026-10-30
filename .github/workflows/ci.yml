@@ -33,6 +33,7 @@ jobs:
         with:
           node-version: 22.22.0
       - run: node Scripts/check-contract.mjs
+      - run: node --test Scripts/simulator.test.mjs
       - run: swift format lint --strict --recursive Package.swift Sources Tests Examples
 
   secret-history:
