@@ -2,14 +2,12 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { run, withFixture } from "./fixture-runner.mjs";
+import { selectSimulator } from "./simulator.mjs";
 
 // Always create a fresh device. No existing device ID or "booted" destination
 // is accepted. Cleanup targets only the exact device created by this run.
 const inventory = JSON.parse(await run("xcrun", ["simctl", "list", "runtimes", "-j"], { capture: true }));
-const runtime = inventory.runtimes.filter(item => item.isAvailable && item.platform === "iOS"
-  && Number(item.version.split(".")[0]) >= 18)
-  .sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }))[0];
-assert.ok(runtime, "Install an iOS 18+ Simulator runtime (minimum-OS certification remains separate)");
+const { runtime, deviceType } = selectSimulator(inventory.runtimes);
 const runID = randomUUID().toLowerCase();
 await mkdir(`TestResults/${runID}`, { recursive: true });
 // The fixture is a loopback HTTP server that needs nothing from the simulator,
@@ -24,7 +22,7 @@ await mkdir(`TestResults/${runID}`, { recursive: true });
 // into the SDK's intentionally short request deadline.
 await withFixture(async origin => {
   const device = await run("xcrun", ["simctl", "create", `Daykeeper-sdk-${runID}`,
-    "com.apple.CoreSimulator.SimDeviceType.iPhone-16", runtime.identifier], { capture: true });
+    deviceType.identifier, runtime.identifier], { capture: true });
   assert.match(device, /^[A-F0-9-]{36}$/i);
   console.log(JSON.stringify({ runID, device, runtime: runtime.identifier }));
   try {
